@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Environment
+.env
+*.env
+!.env.example
+
+# Database / data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# OCR / charts scratch
+*.png
+!docs/**/*.png
+tmp/
+
+# Logs
+*.log
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.idea/
+.vscode/
