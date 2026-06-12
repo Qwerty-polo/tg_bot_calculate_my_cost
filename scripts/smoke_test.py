@@ -64,9 +64,7 @@ async def main() -> None:
         )
         expenses = ExpenseService(session)
         budgets = BudgetService(session)
-        await expenses.add_many(
-            user.id, parsed, default_currency=user.currency, raw_text=text
-        )
+        await expenses.add_many(user.id, parsed, raw_text=text)
         await budgets.set_budget(user.id, BudgetPeriod.WEEK, 5000, user.currency)
 
         analytics = AnalyticsService(expenses, budgets)

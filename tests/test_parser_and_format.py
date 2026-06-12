@@ -16,8 +16,10 @@ def test_progress_bar_clamps():
     assert progress_bar(150) == "█" * 10
 
 
-def test_fmt_money_uses_space_separator():
-    assert fmt_money(1234567.5, "UAH") == "1 234 567.50 UAH"
+def test_fmt_money_uses_space_separator_and_uah_symbol():
+    assert fmt_money(1234567.5) == "1 234 567.50 ₴"
+    # Currency arg is ignored — the bot is UAH-only.
+    assert fmt_money(1234567.5, "USD") == "1 234 567.50 ₴"
 
 
 def test_heuristic_parse_extracts_amounts():

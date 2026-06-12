@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.schemas import ParsedExpense
+from app.config import CURRENCY_CODE
 from app.models import Expense, ExpenseCategory
 
 
@@ -20,18 +21,17 @@ class ExpenseService:
         user_id: int,
         parsed: list[ParsedExpense],
         *,
-        default_currency: str,
         raw_text: str | None = None,
         fallback_dt: datetime | None = None,
     ) -> list[Expense]:
-        """Persist a batch of parsed expenses for a user."""
+        """Persist a batch of parsed expenses for a user (always in UAH)."""
         fallback_dt = fallback_dt or datetime.utcnow()
         created: list[Expense] = []
         for item in parsed:
             expense = Expense(
                 user_id=user_id,
                 amount=item.amount,
-                currency=item.currency or default_currency,
+                currency=CURRENCY_CODE,
                 occurred_at=item.occurred_at or fallback_dt,
                 merchant=item.merchant,
                 category=item.category,
@@ -42,6 +42,13 @@ class ExpenseService:
             created.append(expense)
         await self.session.flush()
         return created
+
+    async def delete_all_for_user(self, user_id: int) -> int:
+        """Delete every expense for a user. Returns the number removed."""
+        result = await self.session.execute(
+            delete(Expense).where(Expense.user_id == user_id)
+        )
+        return result.rowcount or 0
 
     async def list_in_range(
         self, user_id: int, start: datetime, end: datetime

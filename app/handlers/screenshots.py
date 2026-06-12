@@ -64,7 +64,6 @@ async def handle_photo(
     created = await expense_service.add_many(
         user.id,
         parsed,
-        default_currency=user.currency,
         raw_text=text,
     )
 

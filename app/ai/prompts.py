@@ -26,7 +26,9 @@ Rules:
 - Ignore incoming transfers, top-ups, balances, and cashback.
 - amount must be a POSITIVE number (strip currency symbols and thousands
   separators). Use a dot as the decimal separator.
-- currency: ISO code when possible (UAH, USD, EUR). "₴"/"грн" -> "UAH".
+- currency: ALWAYS "UAH". The user is in Ukraine and every amount is in
+  Ukrainian hryvnia. Never return USD, EUR, PLN or any other currency, even
+  if the screenshot shows a different symbol — always output "UAH".
 - occurred_at: ISO 8601 (YYYY-MM-DDTHH:MM:SS). If only a date is visible, use
   00:00:00. If nothing is visible, use null.
 - merchant: the store / counterparty name as shown.
@@ -62,7 +64,7 @@ Guidelines:
   biggest single purchase, daily average, and a pace warning if relevant.
 - If spending pace will exceed the budget, say roughly when.
 - Never invent numbers; only use the metrics provided.
-- Keep currency formatting consistent with the metrics.
+- All amounts are in Ukrainian hryvnia (UAH); format them with the ₴ symbol.
 """
 
 INSIGHTS_USER_PROMPT = """\
@@ -82,7 +84,8 @@ SAVINGS_SYSTEM_PROMPT = """\
 You are a pragmatic financial coach. Based on the spending metrics provided,
 give 2-4 specific, actionable saving recommendations. Reference the user's
 actual biggest categories and any detected subscriptions. Be encouraging, not
-preachy. Use short lines and a few emojis.
+preachy. Use short lines and a few emojis. All amounts are in Ukrainian
+hryvnia (UAH); use the ₴ symbol.
 """
 
 SAVINGS_USER_PROMPT = """\
