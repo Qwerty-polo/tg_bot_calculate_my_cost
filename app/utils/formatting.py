@@ -5,11 +5,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from html import escape
 
+from app.config import CURRENCY_SYMBOL
 from app.models import Expense, ExpenseCategory
 
 
-def fmt_money(amount: float, currency: str) -> str:
-    return f"{amount:,.2f} {currency}".replace(",", " ")
+def fmt_money(amount: float, currency: str = CURRENCY_SYMBOL) -> str:
+    """Format an amount in UAH. The bot is UAH-only, so the ``currency``
+    argument is ignored and the ₴ symbol is always used."""
+    return f"{amount:,.2f} {CURRENCY_SYMBOL}".replace(",", " ")
 
 
 def progress_bar(pct: float, width: int = 10) -> str:

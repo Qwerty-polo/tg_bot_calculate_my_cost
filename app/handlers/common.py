@@ -6,6 +6,8 @@ from aiogram import Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
+from app.handlers.keyboards import main_menu_keyboard
+
 router = Router(name="common")
 
 WELCOME = (
@@ -18,6 +20,7 @@ WELCOME = (
     "• 🎯 /set_week_budget 5000 — set a weekly budget\n"
     "• 🎯 /set_month_budget 20000 — set a monthly budget\n"
     "• 📊 /stats — full financial analysis\n\n"
+    "💱 All amounts are tracked in <b>UAH (₴)</b>.\n"
     "Type /help to see everything I can do."
 )
 
@@ -35,13 +38,15 @@ HELP = (
     "• /month — this month's expenses\n"
     "• /categories — spending by category (with chart)\n"
     "• /stats — full AI financial analysis + charts\n\n"
+    "<b>Manage</b>\n"
+    "• 🗑 Reset Statistics (menu button) — delete all your data\n\n"
     "💡 Tip: clearer screenshots → better extraction."
 )
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
-    await message.answer(WELCOME)
+    await message.answer(WELCOME, reply_markup=main_menu_keyboard())
 
 
 @router.message(Command("help"))

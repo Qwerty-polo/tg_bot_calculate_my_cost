@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 from functools import cached_property
+from typing import ClassVar
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The bot is UAH-only: every amount is stored and displayed in Ukrainian hryvnia.
+CURRENCY_CODE = "UAH"
+CURRENCY_SYMBOL = "₴"
 
 
 class Settings(BaseSettings):
@@ -21,12 +26,20 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
+    # Google's OpenAI-compatible endpoint for the Gemini API. We call Gemini
+    # through the ``openai`` SDK by pointing it at this base URL.
+    GEMINI_BASE_URL: ClassVar[str] = (
+        "https://generativelanguage.googleapis.com/v1beta/openai/"
+    )
+
     # Telegram
     bot_token: str = Field(default="", alias="BOT_TOKEN")
 
-    # OpenAI
-    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
+    # Google Gemini (the only supported LLM provider).
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
+    gemini_model: str = Field(
+        default="gemini-3.1-flash-lite", alias="GEMINI_MODEL"
+    )
 
     # Database
     database_url: str = Field(
@@ -39,7 +52,6 @@ class Settings(BaseSettings):
     ocr_languages: str = Field(default="eng+ukr", alias="OCR_LANGUAGES")
 
     # App
-    default_currency: str = Field(default="UAH", alias="DEFAULT_CURRENCY")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     allowed_user_ids: str = Field(default="", alias="ALLOWED_USER_IDS")
 
@@ -50,6 +62,11 @@ class Settings(BaseSettings):
         if value not in {"tesseract", "easyocr"}:
             raise ValueError("OCR_ENGINE must be 'tesseract' or 'easyocr'")
         return value
+
+    @property
+    def default_currency(self) -> str:
+        """The bot operates exclusively in UAH."""
+        return CURRENCY_CODE
 
     @cached_property
     def allowed_user_id_set(self) -> set[int]:
@@ -62,8 +79,13 @@ class Settings(BaseSettings):
         return result
 
     @property
-    def has_openai(self) -> bool:
-        return bool(self.openai_api_key)
+    def gemini_base_url(self) -> str:
+        return self.GEMINI_BASE_URL
+
+    @property
+    def has_llm(self) -> bool:
+        """Whether a Gemini API key is configured (enables AI features)."""
+        return bool(self.gemini_api_key)
 
 
 settings = Settings()

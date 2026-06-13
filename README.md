@@ -5,15 +5,18 @@ screenshots**. Send a screenshot from Monobank, Privat24, A‑Bank (or any
 banking app) and the bot will:
 
 1. **OCR** the image to extract the raw transaction text.
-2. **Understand** the transactions with an LLM and turn them into structured
-   records (amount, currency, datetime, merchant, category, description).
+2. **Understand** the transactions with **Google Gemini** and turn them into
+   structured records (amount, datetime, merchant, category, description).
 3. **Categorize** each purchase automatically (food, transport, shopping, …).
 4. **Track budgets** (weekly / monthly) and generate **smart financial
    insights** and **charts**.
 
-Built with **aiogram 3**, **SQLAlchemy 2 (async)**, **Alembic**, **OpenAI**,
-**pytesseract/easyocr** and **matplotlib**. Fully asynchronous, Python 3.12+,
-Docker-ready.
+> 💱 **Currency:** the bot is **UAH-only**. Every amount is stored and shown in
+> Ukrainian hryvnia (₴), regardless of what currency a screenshot shows.
+
+Built with **aiogram 3**, **SQLAlchemy 2 (async)**, **Alembic**, **Google
+Gemini** (via its OpenAI-compatible API), **pytesseract/easyocr** and
+**matplotlib**. Fully asynchronous, Python 3.12+, Docker-ready.
 
 ---
 
@@ -30,6 +33,8 @@ Docker-ready.
 - 📈 **Charts** — category pie chart, weekly spending bar chart, monthly trend.
 - 🔁 **Smart detection** — recurring subscriptions, unusually high spending,
   week-over-week comparison, AI saving recommendations.
+- 🗑 **Reset Statistics** — a main-menu button to wipe all your own expenses,
+  budgets and analytics (per-user, with a confirmation step).
 - 🎨 **Beautiful formatting** — emojis, progress bars, percentages.
 
 ---
@@ -41,11 +46,11 @@ app/
 ├── main.py            # entrypoint (long-polling)
 ├── bot/               # Bot + Dispatcher factories, command menu
 ├── config/            # pydantic-settings configuration (.env)
-├── handlers/          # aiogram routers: common, screenshots, budgets, stats
+├── handlers/          # aiogram routers: common, reset, screenshots, budgets, stats
 ├── services/          # DB business logic: user / expense / budget services
 ├── database/          # async engine, session, declarative base
 ├── models/            # SQLAlchemy models + enums
-├── ai/                # OpenAI client, prompts, parsing & analysis
+├── ai/                # Gemini client, prompts, parsing & analysis
 ├── ocr/               # OCR service (tesseract / easyocr)
 ├── analytics/         # metrics, subscription & anomaly detection
 ├── charts/            # matplotlib chart generation
@@ -80,7 +85,7 @@ Screenshot (photo)
 OCR (app/ocr)            tesseract or easyocr, with light preprocessing
    │  raw text
    ▼
-AI parsing (app/ai)      OpenAI chat completion, response_format=json_object
+AI parsing (app/ai)      Gemini chat completion, response_format=json_object
    │  validated with Pydantic (app/ai/schemas.ParsedExpense)
    ▼
 Persistence (services)   ExpenseService.add_many()
@@ -93,7 +98,12 @@ Analytics (app/analytics)  metrics dict (budget %, categories, anomalies, …)
    └── charts (app/charts)                          → PNG images
 ```
 
-**Graceful degradation:** if `OPENAI_API_KEY` is not set, the bot still works:
+**Gemini via the OpenAI SDK:** Gemini is the only LLM provider. It is called
+through the `openai` Python SDK pointed at Google's OpenAI-compatible endpoint
+(`https://generativelanguage.googleapis.com/v1beta/openai/`), so the `openai`
+package is used purely as the HTTP client.
+
+**Graceful degradation:** if `GEMINI_API_KEY` is not set, the bot still works:
 - transaction parsing falls back to a regex heuristic parser, and
 - insights/recommendations fall back to deterministic templates.
 
@@ -110,8 +120,9 @@ The exact prompts live in [`app/ai/prompts.py`](app/ai/prompts.py). In short:
 > text from Ukrainian banking apps… Extract ONLY outgoing expenses and return
 > JSON `{"expenses": [{"amount", "currency", "occurred_at", "merchant",
 > "category", "description"}]}`. Ignore incoming transfers and balances.
-> `amount` must be positive; `category` must be one of food, transport,
-> shopping, entertainment, subscriptions, cafes, health, utilities, other.
+> `amount` must be positive; `currency` is **always "UAH"** (never USD/EUR/PLN);
+> `category` must be one of food, transport, shopping, entertainment,
+> subscriptions, cafes, health, utilities, other.
 
 **Financial analysis (system):**
 
@@ -142,14 +153,14 @@ Example generated insights:
   brew install tesseract tesseract-lang
   ```
 - A **Telegram bot token** from [@BotFather](https://t.me/BotFather)
-- An **OpenAI API key** (optional but recommended) from
-  [platform.openai.com](https://platform.openai.com/api-keys)
+- A **Google Gemini API key** (optional but recommended) from
+  [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
 ### 2. Configure
 
 ```bash
 cp .env.example .env
-# edit .env and set BOT_TOKEN and OPENAI_API_KEY
+# edit .env and set BOT_TOKEN and GEMINI_API_KEY
 ```
 
 ### 3. Install & migrate
@@ -202,12 +213,11 @@ alembic upgrade head
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BOT_TOKEN` | – | Telegram bot token (required) |
-| `OPENAI_API_KEY` | – | OpenAI key (optional; enables AI parsing & insights) |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Chat model used |
+| `GEMINI_API_KEY` | – | Google Gemini key (optional; enables AI parsing & insights) |
+| `GEMINI_MODEL` | `gemini-3.1-flash-lite` | Gemini chat model used |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./data/expenses.db` | Async SQLAlchemy URL |
 | `OCR_ENGINE` | `tesseract` | `tesseract` or `easyocr` |
 | `OCR_LANGUAGES` | `eng+ukr` | OCR languages |
-| `DEFAULT_CURRENCY` | `UAH` | Default currency |
 | `LOG_LEVEL` | `INFO` | Logging level |
 | `ALLOWED_USER_IDS` | – | Comma-separated allow-list (empty = everyone) |
 

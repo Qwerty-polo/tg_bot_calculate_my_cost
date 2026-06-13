@@ -1,8 +1,11 @@
 """High-level AI operations: transaction parsing and financial analysis.
 
-All functions degrade gracefully when no OpenAI key is configured:
+All functions degrade gracefully when no Gemini key is configured:
 - :func:`parse_transactions` falls back to a heuristic regex parser.
 - The insight / recommendation helpers fall back to deterministic templates.
+
+The bot is UAH-only, so every parsed expense is stored in hryvnia regardless of
+any currency symbol that appears in the screenshot.
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ import re
 
 from app.ai import prompts
 from app.ai.schemas import ParsedExpense, ParsedExpenseList
-from app.config import settings
+from app.config import CURRENCY_SYMBOL, settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +27,7 @@ async def parse_transactions(ocr_text: str) -> list[ParsedExpense]:
     if not text:
         return []
 
-    if settings.has_openai:
+    if settings.has_llm:
         try:
             return await _parse_with_ai(text)
         except Exception:  # noqa: BLE001 - fall back, never crash the handler
@@ -49,7 +52,7 @@ async def _parse_with_ai(ocr_text: str) -> list[ParsedExpense]:
 
 _AMOUNT_RE = re.compile(
     r"(?P<amount>\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)\s*"
-    r"(?P<cur>грн|UAH|₴|USD|\$|EUR|€)?",
+    r"(?:грн|UAH|₴|USD|\$|EUR|€)?",
     re.IGNORECASE,
 )
 
@@ -80,7 +83,7 @@ def _heuristic_parse(text: str) -> list[ParsedExpense]:
         expenses.append(
             ParsedExpense(
                 amount=amount,
-                currency=match.group("cur") or settings.default_currency,
+                currency=settings.default_currency,
                 merchant=merchant,
                 description=merchant,
             )
@@ -93,7 +96,7 @@ def _heuristic_parse(text: str) -> list[ParsedExpense]:
 
 async def generate_financial_insights(metrics: dict) -> str:
     """Generate a human-readable financial analysis from computed metrics."""
-    if settings.has_openai:
+    if settings.has_llm:
         try:
             from app.ai.client import chat_text
 
@@ -110,7 +113,7 @@ async def generate_financial_insights(metrics: dict) -> str:
 
 async def generate_saving_recommendations(metrics: dict) -> str:
     """Generate AI saving recommendations from computed metrics."""
-    if settings.has_openai:
+    if settings.has_llm:
         try:
             from app.ai.client import chat_text
 
@@ -126,7 +129,7 @@ async def generate_saving_recommendations(metrics: dict) -> str:
 
 
 def _template_insights(metrics: dict) -> str:
-    currency = metrics.get("currency", settings.default_currency)
+    currency = CURRENCY_SYMBOL
     lines: list[str] = []
     pct = metrics.get("budget_used_pct")
     if pct is not None:
@@ -159,7 +162,7 @@ def _template_insights(metrics: dict) -> str:
 
 
 def _template_savings(metrics: dict) -> str:
-    currency = metrics.get("currency", settings.default_currency)
+    currency = CURRENCY_SYMBOL
     lines = ["💡 *Saving ideas:*"]
     top = metrics.get("top_category")
     if top:

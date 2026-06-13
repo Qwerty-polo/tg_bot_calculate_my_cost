@@ -20,11 +20,13 @@ async def main() -> None:
         raise RuntimeError(
             "BOT_TOKEN is not set. Copy .env.example to .env and fill it in."
         )
-    if not settings.has_openai:
+    if not settings.has_llm:
         logger.warning(
-            "OPENAI_API_KEY is not set — falling back to heuristic parsing and "
+            "GEMINI_API_KEY is not set — falling back to heuristic parsing and "
             "template-based insights."
         )
+    else:
+        logger.info("LLM provider: gemini (model=%s)", settings.gemini_model)
 
     # Create tables on first run (production should use Alembic migrations).
     await init_models()

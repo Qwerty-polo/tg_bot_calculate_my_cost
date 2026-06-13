@@ -10,8 +10,8 @@ SQLAlchemy[asyncio]==2.0.35
 aiosqlite==0.20.0
 alembic==1.13.3
 
-# AI
-openai==1.51.2
+# AI — Google Gemini, called via its OpenAI-compatible API using the openai SDK
+openai==2.41.0
 
 # OCR
 pytesseract==0.3.13

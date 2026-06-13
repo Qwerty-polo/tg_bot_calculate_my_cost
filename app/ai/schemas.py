@@ -6,6 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.config import CURRENCY_CODE
 from app.models.enums import ExpenseCategory
 
 
@@ -13,7 +14,7 @@ class ParsedExpense(BaseModel):
     """A single transaction extracted from a banking screenshot."""
 
     amount: float = Field(..., description="Positive amount spent")
-    currency: str = Field(default="UAH")
+    currency: str = Field(default=CURRENCY_CODE)
     occurred_at: datetime | None = Field(
         default=None, description="When the transaction happened"
     )
@@ -28,11 +29,10 @@ class ParsedExpense(BaseModel):
 
     @field_validator("currency")
     @classmethod
-    def _normalize_currency(cls, value: str) -> str:
-        value = (value or "UAH").strip().upper()
-        # Normalize common symbols / spellings.
-        mapping = {"₴": "UAH", "ГРН": "UAH", "$": "USD", "€": "EUR", "£": "GBP"}
-        return mapping.get(value, value)
+    def _force_uah(cls, _value: str) -> str:
+        # The bot is UAH-only: ignore whatever currency the screenshot/AI
+        # reports and always store hryvnia.
+        return CURRENCY_CODE
 
     @field_validator("category", mode="before")
     @classmethod

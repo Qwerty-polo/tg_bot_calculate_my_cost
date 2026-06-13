@@ -1,4 +1,9 @@
-"""Thin async wrapper around the OpenAI client."""
+"""Thin async wrapper around the Google Gemini chat API.
+
+Gemini is called through the ``openai`` SDK via its OpenAI-compatible endpoint
+(``GEMINI_BASE_URL``). The ``openai`` package here is just the HTTP client — the
+provider is always Gemini.
+"""
 
 from __future__ import annotations
 
@@ -14,10 +19,13 @@ _client: AsyncOpenAI | None = None
 
 
 def get_client() -> AsyncOpenAI:
-    """Return a lazily-created singleton OpenAI client."""
+    """Return a lazily-created singleton Gemini client."""
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=settings.openai_api_key)
+        _client = AsyncOpenAI(
+            api_key=settings.gemini_api_key,
+            base_url=settings.gemini_base_url,
+        )
     return _client
 
 
@@ -25,7 +33,7 @@ async def chat_json(system_prompt: str, user_prompt: str) -> str:
     """Run a chat completion that is forced to return a JSON object."""
     client = get_client()
     response = await client.chat.completions.create(
-        model=settings.openai_model,
+        model=settings.gemini_model,
         response_format={"type": "json_object"},
         temperature=0.2,
         messages=[
@@ -40,7 +48,7 @@ async def chat_text(system_prompt: str, user_prompt: str, temperature: float = 0
     """Run a plain text chat completion."""
     client = get_client()
     response = await client.chat.completions.create(
-        model=settings.openai_model,
+        model=settings.gemini_model,
         temperature=temperature,
         messages=[
             {"role": "system", "content": system_prompt},

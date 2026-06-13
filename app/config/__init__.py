@@ -1,3 +1,8 @@
-from app.config.settings import Settings, settings
+from app.config.settings import (
+    CURRENCY_CODE,
+    CURRENCY_SYMBOL,
+    Settings,
+    settings,
+)
 
-__all__ = ["Settings", "settings"]
+__all__ = ["CURRENCY_CODE", "CURRENCY_SYMBOL", "Settings", "settings"]
