@@ -7,11 +7,10 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 from app.config import CURRENCY_CODE
-from app.models.enums import ExpenseCategory
 
 
 class ParsedExpense(BaseModel):
-    """A single transaction extracted from a banking screenshot."""
+    """A single outgoing transaction extracted from a banking screenshot."""
 
     amount: float = Field(..., description="Positive amount spent")
     currency: str = Field(default=CURRENCY_CODE)
@@ -19,8 +18,6 @@ class ParsedExpense(BaseModel):
         default=None, description="When the transaction happened"
     )
     merchant: str | None = Field(default=None, description="Store / merchant name")
-    category: ExpenseCategory = Field(default=ExpenseCategory.OTHER)
-    description: str | None = Field(default=None, description="Short description")
 
     @field_validator("amount")
     @classmethod
@@ -33,13 +30,6 @@ class ParsedExpense(BaseModel):
         # The bot is UAH-only: ignore whatever currency the screenshot/AI
         # reports and always store hryvnia.
         return CURRENCY_CODE
-
-    @field_validator("category", mode="before")
-    @classmethod
-    def _coerce_category(cls, value: object) -> ExpenseCategory:
-        if isinstance(value, ExpenseCategory):
-            return value
-        return ExpenseCategory.from_value(str(value) if value is not None else None)
 
 
 class ParsedExpenseList(BaseModel):

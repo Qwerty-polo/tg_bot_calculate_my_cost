@@ -41,6 +41,23 @@ async def test_add_many_stores_uah(session):
 
 
 @pytest.mark.asyncio
+async def test_add_many_rejects_incoming(session):
+    user = await UserService(session).get_or_create(1, username="u")
+    expenses = ExpenseService(session)
+    created = await expenses.add_many(
+        user.id,
+        [
+            ParsedExpense(amount=230.5, merchant="Silpo"),
+            ParsedExpense(amount=5000, merchant="Поповнення картки"),
+            ParsedExpense(amount=12, merchant="Cashback"),
+        ],
+    )
+    # Only the real expense is stored; incoming transfers are filtered out.
+    assert len(created) == 1
+    assert created[0].merchant == "Silpo"
+
+
+@pytest.mark.asyncio
 async def test_reset_deletes_only_requesting_user(session):
     users = UserService(session)
     expenses = ExpenseService(session)

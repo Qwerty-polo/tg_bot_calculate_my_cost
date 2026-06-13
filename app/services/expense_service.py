@@ -7,9 +7,10 @@ from datetime import datetime
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai import looks_like_income
 from app.ai.schemas import ParsedExpense
 from app.config import CURRENCY_CODE
-from app.models import Expense, ExpenseCategory
+from app.models import Expense
 
 
 class ExpenseService:
@@ -24,18 +25,22 @@ class ExpenseService:
         raw_text: str | None = None,
         fallback_dt: datetime | None = None,
     ) -> list[Expense]:
-        """Persist a batch of parsed expenses for a user (always in UAH)."""
+        """Persist a batch of parsed expenses for a user (always in UAH).
+
+        Incoming transfers (top-ups, cashback, salary, etc.) are rejected here
+        as a safety net even if the AI accidentally returns one.
+        """
         fallback_dt = fallback_dt or datetime.utcnow()
         created: list[Expense] = []
         for item in parsed:
+            if looks_like_income(item.merchant):
+                continue
             expense = Expense(
                 user_id=user_id,
                 amount=item.amount,
                 currency=CURRENCY_CODE,
                 occurred_at=item.occurred_at or fallback_dt,
                 merchant=item.merchant,
-                category=item.category,
-                description=item.description,
                 raw_text=raw_text,
             )
             self.session.add(expense)
@@ -60,7 +65,7 @@ class ExpenseService:
                 Expense.occurred_at >= start,
                 Expense.occurred_at < end,
             )
-            .order_by(Expense.occurred_at.desc())
+            .order_by(Expense.occurred_at.asc())
         )
         return list(result.scalars().all())
 
@@ -75,50 +80,3 @@ class ExpenseService:
             )
         )
         return float(result.scalar_one())
-
-    async def totals_by_category(
-        self, user_id: int, start: datetime, end: datetime
-    ) -> dict[ExpenseCategory, float]:
-        result = await self.session.execute(
-            select(Expense.category, func.sum(Expense.amount))
-            .where(
-                Expense.user_id == user_id,
-                Expense.occurred_at >= start,
-                Expense.occurred_at < end,
-            )
-            .group_by(Expense.category)
-            .order_by(func.sum(Expense.amount).desc())
-        )
-        return {category: float(total) for category, total in result.all()}
-
-    async def biggest_expense(
-        self, user_id: int, start: datetime, end: datetime
-    ) -> Expense | None:
-        result = await self.session.execute(
-            select(Expense)
-            .where(
-                Expense.user_id == user_id,
-                Expense.occurred_at >= start,
-                Expense.occurred_at < end,
-            )
-            .order_by(Expense.amount.desc())
-            .limit(1)
-        )
-        return result.scalar_one_or_none()
-
-    async def daily_totals(
-        self, user_id: int, start: datetime, end: datetime
-    ) -> dict[str, float]:
-        """Sum of expenses per calendar day (YYYY-MM-DD) within the range."""
-        day = func.strftime("%Y-%m-%d", Expense.occurred_at)
-        result = await self.session.execute(
-            select(day, func.sum(Expense.amount))
-            .where(
-                Expense.user_id == user_id,
-                Expense.occurred_at >= start,
-                Expense.occurred_at < end,
-            )
-            .group_by(day)
-            .order_by(day)
-        )
-        return {str(d): float(total) for d, total in result.all()}

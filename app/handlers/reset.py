@@ -7,8 +7,6 @@ import logging
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.handlers.keyboards import (
     RESET_BUTTON,
@@ -16,7 +14,7 @@ from app.handlers.keyboards import (
     RESET_CONFIRM,
     reset_confirm_keyboard,
 )
-from app.models import AnalyticsSnapshot, User
+from app.models import User
 from app.services import BudgetService, ExpenseService
 
 logger = logging.getLogger(__name__)
@@ -29,8 +27,8 @@ async def cmd_reset_prompt(message: Message) -> None:
     """Ask for confirmation before deleting anything."""
     await message.answer(
         "⚠️ <b>Are you sure?</b>\n\n"
-        "This will permanently delete <b>ALL</b> your expenses and budgets "
-        "and clear your analytics. This cannot be undone.",
+        "This will permanently delete <b>ALL</b> your expenses and budgets. "
+        "This cannot be undone.",
         reply_markup=reset_confirm_keyboard(),
     )
 
@@ -46,7 +44,6 @@ async def on_reset_cancel(callback: CallbackQuery) -> None:
 async def on_reset_confirm(
     callback: CallbackQuery,
     user: User,
-    session: AsyncSession,
     expense_service: ExpenseService,
     budget_service: BudgetService,
     state: FSMContext,
@@ -54,9 +51,6 @@ async def on_reset_confirm(
     """Delete everything that belongs to the requesting user only."""
     expenses_deleted = await expense_service.delete_all_for_user(user.id)
     budgets_deleted = await budget_service.delete_all_for_user(user.id)
-    await session.execute(
-        delete(AnalyticsSnapshot).where(AnalyticsSnapshot.user_id == user.id)
-    )
 
     # Drop any in-progress conversation (e.g. a pending budget prompt).
     await state.clear()
@@ -71,8 +65,7 @@ async def on_reset_confirm(
     summary = (
         "🗑 <b>Statistics reset complete.</b>\n\n"
         f"• Expenses deleted: <b>{expenses_deleted}</b>\n"
-        f"• Budgets removed: <b>{budgets_deleted}</b>\n"
-        "• Analytics cleared\n\n"
+        f"• Budgets removed: <b>{budgets_deleted}</b>\n\n"
         "You're starting fresh — send a screenshot to log new expenses. 📸"
     )
     if isinstance(callback.message, Message):
