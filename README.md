@@ -1,41 +1,37 @@
-# 🤖 AI Expense Tracker — Telegram Bot
+# 🤖 Expense Tracker — Telegram Bot
 
-An AI-powered Telegram bot for **personal expense tracking from banking
+A minimal Telegram bot for **personal expense tracking from banking
 screenshots**. Send a screenshot from Monobank, Privat24, A‑Bank (or any
 banking app) and the bot will:
 
 1. **OCR** the image to extract the raw transaction text.
 2. **Understand** the transactions with **Google Gemini** and turn them into
-   structured records (amount, datetime, merchant, category, description).
-3. **Categorize** each purchase automatically (food, transport, shopping, …).
-4. **Track budgets** (weekly / monthly) and generate **smart financial
-   insights** and **charts**.
+   structured records (amount, time, merchant).
+3. **Skip incoming money** — top-ups, transfers received, cashback, salary and
+   pensions are never counted as expenses.
+4. **Track budgets** (weekly / monthly) and show simple spending totals.
 
 > 💱 **Currency:** the bot is **UAH-only**. Every amount is stored and shown in
 > Ukrainian hryvnia (₴), regardless of what currency a screenshot shows.
 
 Built with **aiogram 3**, **SQLAlchemy 2 (async)**, **Alembic**, **Google
-Gemini** (via its OpenAI-compatible API), **pytesseract/easyocr** and
-**matplotlib**. Fully asynchronous, Python 3.12+, Docker-ready.
+Gemini** (via its OpenAI-compatible API) and **pytesseract/easyocr**. Fully
+asynchronous, Python 3.12+, Docker-ready.
 
 ---
 
 ## ✨ Features
 
-- 📷 **Screenshot analysis** — OCR + AI extraction of every transaction.
-- 🏷️ **Automatic categorization** into: food, transport, shopping,
-  entertainment, subscriptions, cafes, health, utilities, other.
+- 📷 **Screenshot analysis** — OCR + AI extraction of each expense
+  (amount, time, merchant).
+- 🚫 **Incoming money ignored** — top-ups, transfers received, cashback,
+  salary/pension are skipped both by the AI prompt and a DB-layer safety filter.
 - 🎯 **Budget planning** — `/set_week_budget`, `/set_month_budget`.
-- 🧠 **AI financial analysis** — % of budget spent, remaining balance, biggest
-  category, biggest purchase, daily average, and pace warnings.
-- 📊 **Statistics commands** — `/today`, `/week`, `/month`, `/stats`,
-  `/categories`, `/budget_status`.
-- 📈 **Charts** — category pie chart, weekly spending bar chart, monthly trend.
-- 🔁 **Smart detection** — recurring subscriptions, unusually high spending,
-  week-over-week comparison, AI saving recommendations.
-- 🗑 **Reset Statistics** — a main-menu button to wipe all your own expenses,
-  budgets and analytics (per-user, with a confirmation step).
-- 🎨 **Beautiful formatting** — emojis, progress bars, percentages.
+- 📅 **Today's expenses** — `/today` (time — merchant — amount).
+- 📊 **Simple statistics** — `/stats`: totals for today / week / month and the
+  remaining weekly & monthly budget. No charts, no AI insights, no categories.
+- 🗑 **Reset Statistics** — a main-menu button to wipe all your own expenses
+  and budgets (per-user, with a confirmation step).
 
 ---
 
@@ -50,14 +46,12 @@ app/
 ├── services/          # DB business logic: user / expense / budget services
 ├── database/          # async engine, session, declarative base
 ├── models/            # SQLAlchemy models + enums
-├── ai/                # Gemini client, prompts, parsing & analysis
+├── ai/                # Gemini client, prompt, parsing & income filter
 ├── ocr/               # OCR service (tesseract / easyocr)
-├── analytics/         # metrics, subscription & anomaly detection
-├── charts/            # matplotlib chart generation
 ├── middlewares/       # logging + session/services injection
 └── utils/             # formatting, timeframes, logging config
 alembic/               # database migrations
-tests/                 # unit tests (pure analytics, parsing, formatting)
+tests/                 # unit tests (parsing, income filter, formatting)
 scripts/smoke_test.py  # end-to-end pipeline smoke test (no Telegram needed)
 ```
 
@@ -70,9 +64,8 @@ SQLite (MVP) via async SQLAlchemy; migrations managed by Alembic.
 | Table       | Key columns |
 |-------------|-------------|
 | **users**   | `id`, `telegram_id` (unique), `username`, `full_name`, `currency`, `created_at` |
-| **expenses**| `id`, `user_id → users.id`, `amount`, `currency`, `occurred_at`, `merchant`, `category`, `description`, `raw_text`, `created_at` |
+| **expenses**| `id`, `user_id → users.id`, `amount`, `currency`, `occurred_at`, `merchant`, `raw_text`, `created_at` |
 | **budgets** | `id`, `user_id → users.id`, `period` (week/month), `amount`, `currency`, `created_at` — unique per (user, period) |
-| **analytics** | `id`, `user_id → users.id`, `period`, `metrics_json`, `insight_text`, `created_at` |
 
 ---
 
@@ -88,14 +81,10 @@ OCR (app/ocr)            tesseract or easyocr, with light preprocessing
 AI parsing (app/ai)      Gemini chat completion, response_format=json_object
    │  validated with Pydantic (app/ai/schemas.ParsedExpense)
    ▼
-Persistence (services)   ExpenseService.add_many()
+Persistence (services)   ExpenseService.add_many() — rejects incoming money
    │
    ▼
-Analytics (app/analytics)  metrics dict (budget %, categories, anomalies, …)
-   │
-   ├── deterministic formatting (utils/formatting) → message text
-   ├── AI narrative (app/ai)                        → human insights
-   └── charts (app/charts)                          → PNG images
+Formatting (utils)       simple expense list + totals → message text
 ```
 
 **Gemini via the OpenAI SDK:** Gemini is the only LLM provider. It is called
@@ -103,12 +92,11 @@ through the `openai` Python SDK pointed at Google's OpenAI-compatible endpoint
 (`https://generativelanguage.googleapis.com/v1beta/openai/`), so the `openai`
 package is used purely as the HTTP client.
 
-**Graceful degradation:** if `GEMINI_API_KEY` is not set, the bot still works:
-- transaction parsing falls back to a regex heuristic parser, and
-- insights/recommendations fall back to deterministic templates.
+**Graceful degradation:** if `GEMINI_API_KEY` is not set, transaction parsing
+falls back to a regex heuristic parser (which also skips incoming-money lines).
 
 OCR runs in a worker thread (`asyncio.to_thread`) so the event loop is never
-blocked; charts are generated the same way.
+blocked.
 
 ### Example AI prompts
 
@@ -117,26 +105,13 @@ The exact prompts live in [`app/ai/prompts.py`](app/ai/prompts.py). In short:
 **Transaction extraction (system):**
 
 > You are a meticulous financial data extraction engine… You receive raw OCR
-> text from Ukrainian banking apps… Extract ONLY outgoing expenses and return
-> JSON `{"expenses": [{"amount", "currency", "occurred_at", "merchant",
-> "category", "description"}]}`. Ignore incoming transfers and balances.
-> `amount` must be positive; `currency` is **always "UAH"** (never USD/EUR/PLN);
-> `category` must be one of food, transport, shopping, entertainment,
-> subscriptions, cafes, health, utilities, other.
-
-**Financial analysis (system):**
-
-> You are a friendly personal finance assistant. Given precomputed metrics,
-> write a short, concrete analysis (3–5 lines): % of budget spent, remaining
-> balance, biggest category, biggest purchase, daily average, and a pace
-> warning. Never invent numbers.
-
-Example generated insights:
-
-- "You already spent 72% of your weekly budget."
-- "Most of your money this week went to food (43%)."
-- "Your biggest expense was Rozetka — 1850 UAH."
-- "If you continue spending at this pace, you may exceed your budget in 3 days."
+> text from Ukrainian banking apps… Extract ONLY outgoing expenses (money the
+> user SPENT) and return JSON
+> `{"expenses": [{"amount", "currency", "occurred_at", "merchant"}]}`.
+> **Skip incoming money completely** — incoming transfers and top-ups
+> (поповнення, зарахування, переказ від, надходження), cashback, salary and
+> pensions. `amount` must be positive; `currency` is **always "UAH"**
+> (never USD/EUR/PLN).
 
 ---
 
@@ -213,8 +188,8 @@ alembic upgrade head
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BOT_TOKEN` | – | Telegram bot token (required) |
-| `GEMINI_API_KEY` | – | Google Gemini key (optional; enables AI parsing & insights) |
-| `GEMINI_MODEL` | `gemini-3.1-flash-lite` | Gemini chat model used |
+| `GEMINI_API_KEY` | – | Google Gemini key (optional; enables AI parsing) |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | Gemini chat model used |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./data/expenses.db` | Async SQLAlchemy URL |
 | `OCR_ENGINE` | `tesseract` | `tesseract` or `easyocr` |
 | `OCR_LANGUAGES` | `eng+ukr` | OCR languages |

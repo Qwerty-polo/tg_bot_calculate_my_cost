@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, time, timedelta
 
-from app.models.enums import BudgetPeriod
-
 
 def start_of_day(now: datetime) -> datetime:
     return datetime.combine(now.date(), time.min)
@@ -29,19 +27,3 @@ def month_range(now: datetime) -> tuple[datetime, datetime]:
     else:
         end = datetime(now.year, now.month + 1, 1)
     return start, end
-
-
-def range_for_period(period: BudgetPeriod, now: datetime) -> tuple[datetime, datetime]:
-    if period is BudgetPeriod.WEEK:
-        return week_range(now)
-    return month_range(now)
-
-
-def days_elapsed(start: datetime, now: datetime) -> float:
-    """Fractional days elapsed since ``start`` (at least a fraction of a day)."""
-    delta = (now - start).total_seconds() / 86400.0
-    return max(delta, 1e-6)
-
-
-def total_days(start: datetime, end: datetime) -> float:
-    return max((end - start).total_seconds() / 86400.0, 1e-6)

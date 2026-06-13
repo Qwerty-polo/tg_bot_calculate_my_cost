@@ -6,45 +6,38 @@ from collections.abc import Sequence
 from html import escape
 
 from app.config import CURRENCY_SYMBOL
-from app.models import Expense, ExpenseCategory
+from app.models import Expense
 
 
-def fmt_money(amount: float, currency: str = CURRENCY_SYMBOL) -> str:
-    """Format an amount in UAH. The bot is UAH-only, so the ``currency``
-    argument is ignored and the ₴ symbol is always used."""
-    return f"{amount:,.2f} {CURRENCY_SYMBOL}".replace(",", " ")
+def fmt_money(amount: float) -> str:
+    """Format an amount in UAH as ``₴1 234`` (the bot is UAH-only).
 
-
-def progress_bar(pct: float, width: int = 10) -> str:
-    """A unicode progress bar, clamped to [0, 100]."""
-    pct = max(0.0, min(pct, 100.0))
-    filled = round(pct / 100 * width)
-    return "█" * filled + "░" * (width - filled)
+    Whole amounts drop the decimals; fractional amounts keep two.
+    """
+    amount = float(amount)
+    if amount == int(amount):
+        body = f"{int(amount):,}".replace(",", " ")
+    else:
+        body = f"{amount:,.2f}".replace(",", " ")
+    return f"{CURRENCY_SYMBOL}{body}"
 
 
 def format_expense_line(expense: Expense) -> str:
-    cat = expense.category if isinstance(expense.category, ExpenseCategory) else (
-        ExpenseCategory.from_value(str(expense.category))
-    )
-    merchant = escape(expense.merchant or expense.description or "Purchase")
-    when = expense.occurred_at.strftime("%d.%m %H:%M")
-    return (
-        f"{cat.emoji} <b>{fmt_money(float(expense.amount), expense.currency)}</b> "
-        f"— {merchant} <i>({when})</i>"
-    )
+    merchant = escape(expense.merchant or "Purchase")
+    when = expense.occurred_at.strftime("%H:%M")
+    return f"{when} — {merchant} {fmt_money(float(expense.amount))}"
 
 
-def format_expense_list(expenses: Sequence[Expense], *, title: str) -> str:
+def format_today(expenses: Sequence[Expense]) -> str:
     if not expenses:
-        return f"<b>{escape(title)}</b>\n\nNo expenses recorded yet."
-    lines = [f"<b>{escape(title)}</b>", ""]
+        return "Today's expenses:\n\nNothing logged yet. Send a screenshot. 📸"
+    lines = ["<b>Today's expenses:</b>", ""]
     total = 0.0
-    currency = expenses[0].currency
     for expense in expenses:
         lines.append(format_expense_line(expense))
         total += float(expense.amount)
     lines.append("")
-    lines.append(f"<b>Total:</b> {fmt_money(total, currency)} • {len(expenses)} item(s)")
+    lines.append(f"<b>Total today:</b> {fmt_money(total)}")
     return "\n".join(lines)
 
 
@@ -54,69 +47,48 @@ def format_added_summary(expenses: Sequence[Expense]) -> str:
             "🤔 I couldn't find any expenses in that screenshot.\n"
             "Try a clearer image of the transactions list."
         )
-    currency = expenses[0].currency
     total = sum(float(e.amount) for e in expenses)
-    header = f"✅ Added <b>{len(expenses)}</b> expense(s) • {fmt_money(total, currency)}"
-    lines = [header, ""]
+    lines = [f"✅ Added <b>{len(expenses)}</b> expense(s):", ""]
     lines.extend(format_expense_line(e) for e in expenses)
-    return "\n".join(lines)
-
-
-def format_categories(metrics: dict) -> str:
-    categories = metrics.get("categories") or []
-    currency = metrics.get("currency", "")
-    if not categories:
-        return "📊 <b>Categories</b>\n\nNo expenses recorded for this period yet."
-    lines = [f"📊 <b>Spending by category ({escape(str(metrics.get('period')))})</b>", ""]
-    for cat in categories:
-        bar = progress_bar(cat["pct"])
-        lines.append(
-            f"{cat['emoji']} <b>{escape(cat['name'])}</b>\n"
-            f"   {bar} {cat['pct']:.0f}% • {fmt_money(cat['amount'], currency)}"
-        )
     lines.append("")
-    lines.append(f"<b>Total:</b> {fmt_money(metrics.get('total_spent', 0.0), currency)}")
+    lines.append(f"<b>Total:</b> {fmt_money(total)}")
     return "\n".join(lines)
 
 
-def format_budget_status(metrics: dict) -> str:
-    currency = metrics.get("currency", "")
-    period = escape(str(metrics.get("period")))
-    lines = [f"🎯 <b>Budget status ({period})</b>", ""]
-    if "budget" not in metrics:
-        lines.append(
-            "No budget set for this period.\n"
-            "Use /set_week_budget or /set_month_budget to add one."
-        )
-        lines.append("")
-        lines.append(
-            f"Spent so far: <b>{fmt_money(metrics.get('total_spent', 0.0), currency)}</b>"
-        )
-        return "\n".join(lines)
+def format_stats(
+    *,
+    today_total: float,
+    week_total: float,
+    month_total: float,
+    week_budget: float | None,
+    month_budget: float | None,
+) -> str:
+    """Ultra-simple statistics block."""
+    lines = ["<b>📊 Statistics</b>", ""]
+    lines.append(f"Total today: {fmt_money(today_total)}")
 
-    used = metrics.get("budget_used_pct", 0.0)
-    lines.append(f"{progress_bar(used)} <b>{used:.0f}%</b>")
-    lines.append("")
-    lines.append(f"Budget: <b>{fmt_money(metrics['budget'], currency)}</b>")
-    lines.append(f"Spent: <b>{fmt_money(metrics.get('total_spent', 0.0), currency)}</b>")
-    lines.append(
-        f"Remaining: <b>{fmt_money(metrics.get('budget_remaining', 0.0), currency)}</b>"
-    )
-    forecast = metrics.get("days_until_overspend")
-    if forecast is not None:
-        lines.append("")
+    if week_budget is not None:
         lines.append(
-            f"⚠️ At this pace you may exceed your budget in ~{forecast} day(s)."
+            f"Total this week: {fmt_money(week_total)} / {fmt_money(week_budget)} limit"
         )
+    else:
+        lines.append(f"Total this week: {fmt_money(week_total)}")
+
+    if month_budget is not None:
+        lines.append(
+            f"Total this month: {fmt_money(month_total)} / "
+            f"{fmt_money(month_budget)} limit"
+        )
+    else:
+        lines.append(f"Total this month: {fmt_money(month_total)}")
+
+    if week_budget is not None or month_budget is not None:
+        lines.append("")
+        if week_budget is not None:
+            remaining = max(week_budget - week_total, 0.0)
+            lines.append(f"Remaining weekly budget: {fmt_money(remaining)}")
+        if month_budget is not None:
+            remaining = max(month_budget - month_total, 0.0)
+            lines.append(f"Remaining monthly budget: {fmt_money(remaining)}")
+
     return "\n".join(lines)
-
-
-def format_period_header(metrics: dict) -> str:
-    currency = metrics.get("currency", "")
-    period = escape(str(metrics.get("period")))
-    total = metrics.get("total_spent", 0.0)
-    count = metrics.get("expense_count", 0)
-    return (
-        f"🧾 <b>{period.capitalize()} summary</b>\n"
-        f"Spent <b>{fmt_money(total, currency)}</b> across {count} expense(s)."
-    )

@@ -36,7 +36,8 @@ def _preprocess(image: Image.Image) -> Image.Image:
 def _extract_tesseract(image_bytes: bytes) -> str:
     import pytesseract
 
-    pytesseract.pytesseract.tesseract_cmd = r'D:\Teseract\tesseract.exe'
+    if settings.tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = settings.tesseract_cmd
     image = Image.open(io.BytesIO(image_bytes))
     processed = _preprocess(image)
     lang = settings.ocr_languages or "eng"

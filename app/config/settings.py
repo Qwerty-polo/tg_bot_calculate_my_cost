@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # Google Gemini (the only supported LLM provider).
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     gemini_model: str = Field(
-        default="gemini-3.1-flash-lite", alias="GEMINI_MODEL"
+        default="gemini-3.5-flash", alias="GEMINI_MODEL"
     )
 
     # Database
@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # OCR
     ocr_engine: str = Field(default="tesseract", alias="OCR_ENGINE")
     ocr_languages: str = Field(default="eng+ukr", alias="OCR_LANGUAGES")
+    # Explicit path to the tesseract binary. Leave empty to use the one on
+    # PATH (Linux/macOS/CI/Docker). On Windows set e.g.
+    # TESSERACT_CMD=C:\\Program Files\\Tesseract-OCR\\tesseract.exe
+    tesseract_cmd: str = Field(default="", alias="TESSERACT_CMD")
 
     # App
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

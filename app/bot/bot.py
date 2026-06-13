@@ -16,11 +16,7 @@ BOT_COMMANDS = [
     BotCommand(command="start", description="Start / how it works"),
     BotCommand(command="help", description="Show help"),
     BotCommand(command="today", description="Today's expenses"),
-    BotCommand(command="week", description="This week's expenses"),
-    BotCommand(command="month", description="This month's expenses"),
-    BotCommand(command="categories", description="Spending by category"),
-    BotCommand(command="stats", description="Full AI financial analysis"),
-    BotCommand(command="budget_status", description="Budget status"),
+    BotCommand(command="stats", description="Totals & remaining budget"),
     BotCommand(command="set_week_budget", description="Set weekly budget"),
     BotCommand(command="set_month_budget", description="Set monthly budget"),
 ]
