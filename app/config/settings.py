@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # Google Gemini (the only supported LLM provider).
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     gemini_model: str = Field(
-        default="gemini-3.1-flash-lite", alias="GEMINI_MODEL"
+        default="gemini-3.5-flash", alias="GEMINI_MODEL"
     )
 
     # Database

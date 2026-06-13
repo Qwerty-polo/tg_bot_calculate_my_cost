@@ -189,7 +189,7 @@ alembic upgrade head
 |----------|---------|-------------|
 | `BOT_TOKEN` | – | Telegram bot token (required) |
 | `GEMINI_API_KEY` | – | Google Gemini key (optional; enables AI parsing) |
-| `GEMINI_MODEL` | `gemini-3.1-flash-lite` | Gemini chat model used |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | Gemini chat model used |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./data/expenses.db` | Async SQLAlchemy URL |
 | `OCR_ENGINE` | `tesseract` | `tesseract` or `easyocr` |
 | `OCR_LANGUAGES` | `eng+ukr` | OCR languages |
