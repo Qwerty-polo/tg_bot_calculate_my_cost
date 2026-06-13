@@ -58,6 +58,38 @@ async def test_add_many_rejects_incoming(session):
 
 
 @pytest.mark.asyncio
+async def test_add_many_logs_past_dated_expense_under_today(session):
+    # A screenshot's transaction dated days ago must still appear under "today",
+    # since the bot logs expenses at receipt time.
+    from datetime import timedelta
+
+    from app.utils.timeframe import day_range
+
+    user = await UserService(session).get_or_create(1, username="u")
+    expenses = ExpenseService(session)
+    old = datetime.utcnow() - timedelta(days=3)
+    await expenses.add_many(
+        user.id, [ParsedExpense(amount=245, merchant="Silpo", occurred_at=old)]
+    )
+    start, end = day_range(datetime.utcnow())
+    assert await expenses.total_in_range(user.id, start, end) == 245
+
+
+@pytest.mark.asyncio
+async def test_add_many_keeps_same_day_purchase_time(session):
+    user = await UserService(session).get_or_create(1, username="u")
+    expenses = ExpenseService(session)
+    today_time = datetime.utcnow().replace(hour=9, minute=15, second=0, microsecond=0)
+    created = await expenses.add_many(
+        user.id,
+        [ParsedExpense(amount=50, merchant="Cafe", occurred_at=today_time)],
+        fallback_dt=datetime.utcnow().replace(hour=18),
+    )
+    # Same-day purchase time is preserved (not overwritten by the receipt time).
+    assert created[0].occurred_at.hour == 9
+
+
+@pytest.mark.asyncio
 async def test_reset_deletes_only_requesting_user(session):
     users = UserService(session)
     expenses = ExpenseService(session)

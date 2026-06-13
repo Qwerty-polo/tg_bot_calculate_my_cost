@@ -29,17 +29,25 @@ class ExpenseService:
 
         Incoming transfers (top-ups, cashback, salary, etc.) are rejected here
         as a safety net even if the AI accidentally returns one.
+
+        Expenses are logged at the receipt time (``fallback_dt``, i.e. now) so
+        they always show up under "today". A purchase time parsed from the
+        screenshot is only kept when it falls on the same calendar day, since
+        OCR/AI often reports a past or wrongly-guessed date.
         """
         fallback_dt = fallback_dt or datetime.utcnow()
         created: list[Expense] = []
         for item in parsed:
             if looks_like_income(item.merchant):
                 continue
+            occurred_at = item.occurred_at
+            if occurred_at is None or occurred_at.date() != fallback_dt.date():
+                occurred_at = fallback_dt
             expense = Expense(
                 user_id=user_id,
                 amount=item.amount,
                 currency=CURRENCY_CODE,
-                occurred_at=item.occurred_at or fallback_dt,
+                occurred_at=occurred_at,
                 merchant=item.merchant,
                 raw_text=raw_text,
             )
