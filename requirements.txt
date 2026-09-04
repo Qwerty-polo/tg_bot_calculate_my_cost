@@ -17,11 +17,5 @@ openai==2.41.0
 pytesseract==0.3.13
 Pillow==10.4.0
 
-# Charts
-matplotlib==3.9.2
-
-# Utilities
-python-dateutil==2.9.0.post0
-
 # Optional heavier OCR engine (enable with OCR_ENGINE=easyocr)
 # easyocr==1.7.2

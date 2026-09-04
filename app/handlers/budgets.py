@@ -55,7 +55,7 @@ async def _apply_budget(
     label = "weekly" if period is BudgetPeriod.WEEK else "monthly"
     await message.answer(
         f"🎯 Your <b>{label}</b> budget is set to "
-        f"<b>{fmt_money(float(budget.amount), budget.currency)}</b>.\n"
+        f"<b>{fmt_money(float(budget.amount))}</b>.\n"
         f"I'll track your spending against it automatically."
     )
 

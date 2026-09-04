@@ -22,8 +22,7 @@ async def main() -> None:
         )
     if not settings.has_llm:
         logger.warning(
-            "GEMINI_API_KEY is not set — falling back to heuristic parsing and "
-            "template-based insights."
+            "GEMINI_API_KEY is not set — falling back to heuristic parsing."
         )
     else:
         logger.info("LLM provider: gemini (model=%s)", settings.gemini_model)
