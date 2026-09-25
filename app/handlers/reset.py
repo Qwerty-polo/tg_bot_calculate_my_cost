@@ -1,4 +1,4 @@
-"""Reset Statistics: wipe a single user's expenses, budgets and analytics."""
+"""Reset Statistics: wipe a user's expenses, budgets, and upload fingerprints."""
 
 from __future__ import annotations
 

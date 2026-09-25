@@ -4,7 +4,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-# System dependencies: tesseract OCR (with Ukrainian) + fonts for matplotlib.
+# System dependencies: Tesseract OCR (with Ukrainian), graphics library, and fonts.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tesseract-ocr \
         tesseract-ocr-ukr \
