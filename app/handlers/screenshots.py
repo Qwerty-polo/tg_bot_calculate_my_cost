@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from hashlib import sha256
 
 from aiogram import F, Router
 from aiogram.types import Message
@@ -59,5 +60,11 @@ async def handle_photo(
         )
         return
 
-    created = await expense_service.add_many(user.id, parsed, raw_text=text)
+    async with expense_service.session.begin():
+        created = await expense_service.add_upload(
+            user.id, sha256(image_bytes).hexdigest(), parsed, raw_text=text
+        )
+    if created is None:
+        await status.edit_text("This screenshot has already been recorded. Nothing was added.")
+        return
     await status.edit_text(format_added_summary(created))

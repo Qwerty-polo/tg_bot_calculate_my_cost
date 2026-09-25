@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from aiogram import Router
 from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.handlers.keyboards import main_menu_keyboard
@@ -33,6 +34,7 @@ HELP = (
     "<b>Budgets</b>\n"
     "• /set_week_budget [amount]\n"
     "• /set_month_budget [amount]\n\n"
+    "• /cancel — cancel pending budget input\n\n"
     "<b>Statistics</b>\n"
     "• /today — today's expenses\n"
     "• /stats — totals (today / week / month) & remaining budget\n\n"
@@ -43,8 +45,20 @@ HELP = (
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message) -> None:
+async def cmd_start(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    if message.chat.type != "private":
+        await message.answer(
+            "Hi! Open a private chat with me to track expenses. Use /help for help."
+        )
+        return
     await message.answer(WELCOME, reply_markup=main_menu_keyboard())
+
+
+@router.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer("Cancelled. You can send a screenshot or start a new command.")
 
 
 @router.message(Command("help"))

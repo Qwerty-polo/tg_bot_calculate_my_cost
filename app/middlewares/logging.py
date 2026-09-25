@@ -20,12 +20,9 @@ class LoggingMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         if isinstance(event, Message):
-            user = event.from_user
-            content = event.text or ("<photo>" if event.photo else "<non-text>")
             logger.info(
-                "msg from %s (%s): %s",
-                user.id if user else "?",
-                user.username if user else "?",
-                content,
+                "Incoming message: type=%s chat_type=%s",
+                event.content_type,
+                event.chat.type,
             )
         return await handler(event, data)

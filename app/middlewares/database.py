@@ -1,8 +1,7 @@
 """Middleware that provides a DB session, services and the current user.
 
-Wrapping the handler in a single transactional session keeps handlers simple:
-they receive ready-to-use services and a persisted ``User`` row, and the
-session is committed (or rolled back) automatically.
+User setup commits before dispatch. Handlers own short database-only
+transactions; closing the session rolls back any unfinished work.
 """
 
 from __future__ import annotations
@@ -12,7 +11,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message, TelegramObject
+from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from app.config import settings
 from app.database.session import create_session_factory
@@ -28,6 +27,19 @@ class ServicesMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
+        message = event if isinstance(event, Message) else getattr(event, "message", None)
+        if not isinstance(message, Message) or message.chat.type != "private":
+            # Common commands need no DB and remain usable in groups.
+            if isinstance(event, Message):
+                command = (event.text or "").split(maxsplit=1)[0:1]
+                name = command[0].split("@")[0] if command else ""
+                if name in {"/start", "/help", "/cancel"}:
+                    return await handler(event, data)
+                await event.answer("Please use a private chat with me for expense tracking.")
+            elif isinstance(event, CallbackQuery):
+                await event.answer("Please use a private chat with me.", show_alert=True)
+            return None
+
         tg_user = data.get("event_from_user")
         if tg_user is None:
             return await handler(event, data)
@@ -41,21 +53,16 @@ class ServicesMiddleware(BaseMiddleware):
 
         factory = create_session_factory()
         async with factory() as session:
-            try:
+            async with session.begin():
                 user_service = UserService(session)
                 user = await user_service.get_or_create(
                     tg_user.id,
                     username=tg_user.username,
                     full_name=tg_user.full_name,
                 )
-                data["session"] = session
-                data["user"] = user
-                data["user_service"] = user_service
-                data["expense_service"] = ExpenseService(session)
-                data["budget_service"] = BudgetService(session)
-                result = await handler(event, data)
-                await session.commit()
-                return result
-            except Exception:
-                await session.rollback()
-                raise
+            data["session"] = session
+            data["user"] = user
+            data["user_service"] = user_service
+            data["expense_service"] = ExpenseService(session)
+            data["budget_service"] = BudgetService(session)
+            return await handler(event, data)

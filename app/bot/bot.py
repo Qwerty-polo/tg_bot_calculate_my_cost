@@ -15,6 +15,7 @@ from app.middlewares import LoggingMiddleware, ServicesMiddleware
 BOT_COMMANDS = [
     BotCommand(command="start", description="Start / how it works"),
     BotCommand(command="help", description="Show help"),
+    BotCommand(command="cancel", description="Cancel pending budget input"),
     BotCommand(command="today", description="Today's expenses"),
     BotCommand(command="stats", description="Totals & remaining budget"),
     BotCommand(command="set_week_budget", description="Set weekly budget"),

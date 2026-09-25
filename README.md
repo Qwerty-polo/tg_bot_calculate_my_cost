@@ -207,3 +207,32 @@ pip install easyocr
 OCR_ENGINE=easyocr
 OCR_LANGUAGES=en,uk
 ```
+
+## Reliability and privacy notes
+
+- Expense uploads, budgets, statistics, and resets are available only in private
+  chats. `/start`, `/help`, and `/cancel` remain available in groups.
+- `/cancel` clears a pending budget prompt. Slash commands are never treated as
+  budget amounts; `/start` and a new budget command clear stale input state.
+- The fallback parser accepts only a merchant followed by an explicit UAH amount
+  on the same line. It skips balance/account headers and ambiguous layouts rather
+  than guessing. Send a clearer screenshot if no expenses are found.
+- Amounts must be finite, positive, have at most two decimal places, and fit the
+  database's `Numeric(12, 2)` range.
+- Successful uploads store a SHA-256 fingerprint of the downloaded image per
+  user, atomically with their expenses. Exact reuploads are ignored, including
+  concurrent attempts. Cropped/recompressed images and overlapping transaction
+  lists are **not** deduplicated. Failed uploads can be retried; Reset Statistics
+  also clears the requesting user's fingerprints. Earlier uploads have no
+  fingerprints and cannot be detected retrospectively.
+- Database transactions finish before OCR, AI, or Telegram network calls. A
+  failed confirmation message does not undo successfully saved data.
+- Operational message logs omit message bodies and profile details. OCR text is
+  still stored in the database and sent to Google when Gemini is enabled.
+- `.dockerignore` excludes local credentials, Git history, databases, IDE files,
+  and caches from image builds. Supply credentials at runtime.
+
+For an existing Alembic-managed installation, run `alembic upgrade head` before
+restarting to create the `uploads` table. Docker Compose does not run migrations
+automatically. Databases created only through `create_all()` still require a
+separate migration-baseline procedure; do not blindly stamp an unverified schema.

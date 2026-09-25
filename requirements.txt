@@ -15,7 +15,7 @@ openai==2.41.0
 
 # OCR
 pytesseract==0.3.13
-Pillow==10.4.0
+Pillow==12.1.1
 
 # Optional heavier OCR engine (enable with OCR_ENGINE=easyocr)
 # easyocr==1.7.2

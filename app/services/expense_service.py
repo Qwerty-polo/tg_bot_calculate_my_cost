@@ -5,17 +5,35 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import looks_like_income
 from app.ai.schemas import ParsedExpense
 from app.config import CURRENCY_CODE
-from app.models import Expense
+from app.models import Expense, Upload
+from app.utils.money import validate_amount
 
 
 class ExpenseService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def add_upload(
+        self, user_id: int, digest: str, parsed: list[ParsedExpense], *, raw_text: str
+    ) -> list[Expense] | None:
+        """Return None for a duplicate. Caller commits marker and rows together."""
+        parsed = [item for item in parsed if not looks_like_income(item.merchant)]
+        if not parsed:
+            return []
+        result = await self.session.execute(
+            insert(Upload).values(user_id=user_id, digest=digest).on_conflict_do_nothing(
+                index_elements=["user_id", "digest"]
+            )
+        )
+        if result.rowcount == 0:
+            return None
+        return await self.add_many(user_id, parsed, raw_text=raw_text)
 
     async def add_many(
         self,
@@ -45,7 +63,7 @@ class ExpenseService:
                 occurred_at = fallback_dt
             expense = Expense(
                 user_id=user_id,
-                amount=item.amount,
+                amount=validate_amount(item.amount),
                 currency=CURRENCY_CODE,
                 occurred_at=occurred_at,
                 merchant=item.merchant,
@@ -58,6 +76,7 @@ class ExpenseService:
 
     async def delete_all_for_user(self, user_id: int) -> int:
         """Delete every expense for a user. Returns the number removed."""
+        await self.session.execute(delete(Upload).where(Upload.user_id == user_id))
         result = await self.session.execute(
             delete(Expense).where(Expense.user_id == user_id)
         )

@@ -49,8 +49,9 @@ async def on_reset_confirm(
     state: FSMContext,
 ) -> None:
     """Delete everything that belongs to the requesting user only."""
-    expenses_deleted = await expense_service.delete_all_for_user(user.id)
-    budgets_deleted = await budget_service.delete_all_for_user(user.id)
+    async with expense_service.session.begin():
+        expenses_deleted = await expense_service.delete_all_for_user(user.id)
+        budgets_deleted = await budget_service.delete_all_for_user(user.id)
 
     # Drop any in-progress conversation (e.g. a pending budget prompt).
     await state.clear()

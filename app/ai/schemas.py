@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 from app.config import CURRENCY_CODE
+from app.utils.money import validate_amount
 
 
 class ParsedExpense(BaseModel):
@@ -22,7 +23,7 @@ class ParsedExpense(BaseModel):
     @field_validator("amount")
     @classmethod
     def _positive_amount(cls, value: float) -> float:
-        return abs(value)
+        return validate_amount(value)
 
     @field_validator("currency")
     @classmethod

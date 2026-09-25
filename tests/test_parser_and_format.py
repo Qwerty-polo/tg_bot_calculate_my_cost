@@ -20,8 +20,7 @@ def test_heuristic_parse_extracts_amounts():
     text = "Rozetka 1 850,00 грн\nSilpo 230.50 грн\nBalance: 9999"
     expenses = _heuristic_parse(text)
     amounts = sorted(e.amount for e in expenses)
-    assert 230.5 in amounts
-    assert 1850.0 in amounts
+    assert amounts == [230.5, 1850.0]
 
 
 def test_heuristic_parse_skips_incoming():

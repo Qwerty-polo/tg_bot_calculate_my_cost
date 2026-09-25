@@ -21,7 +21,8 @@ async def cmd_today(
     message: Message, user: User, expense_service: ExpenseService
 ) -> None:
     start, end = day_range(datetime.utcnow())
-    expenses = await expense_service.list_in_range(user.id, start, end)
+    async with expense_service.session.begin():
+        expenses = await expense_service.list_in_range(user.id, start, end)
     await message.answer(format_today(expenses))
 
 
@@ -37,12 +38,13 @@ async def cmd_stats(
     week_start, week_end = week_range(now)
     month_start, month_end = month_range(now)
 
-    today_total = await expense_service.total_in_range(user.id, day_start, day_end)
-    week_total = await expense_service.total_in_range(user.id, week_start, week_end)
-    month_total = await expense_service.total_in_range(user.id, month_start, month_end)
+    async with expense_service.session.begin():
+        today_total = await expense_service.total_in_range(user.id, day_start, day_end)
+        week_total = await expense_service.total_in_range(user.id, week_start, week_end)
+        month_total = await expense_service.total_in_range(user.id, month_start, month_end)
 
-    week_budget = await budget_service.get_budget(user.id, BudgetPeriod.WEEK)
-    month_budget = await budget_service.get_budget(user.id, BudgetPeriod.MONTH)
+        week_budget = await budget_service.get_budget(user.id, BudgetPeriod.WEEK)
+        month_budget = await budget_service.get_budget(user.id, BudgetPeriod.MONTH)
 
     await message.answer(
         format_stats(

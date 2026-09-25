@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import CURRENCY_CODE
 from app.models import Budget, BudgetPeriod
+from app.utils.money import validate_amount
 
 
 class BudgetService:
@@ -21,6 +22,7 @@ class BudgetService:
         currency: str = CURRENCY_CODE,
     ) -> Budget:
         """Create or update the user's budget for the given period (UAH)."""
+        amount = validate_amount(amount)
         result = await self.session.execute(
             select(Budget).where(
                 Budget.user_id == user_id, Budget.period == period

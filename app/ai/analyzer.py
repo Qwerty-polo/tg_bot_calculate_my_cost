@@ -15,6 +15,7 @@ import re
 from app.ai import prompts
 from app.ai.schemas import ParsedExpense, ParsedExpenseList
 from app.config import settings
+from app.utils.money import validate_amount
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +68,15 @@ async def _parse_with_ai(ocr_text: str) -> list[ParsedExpense]:
 
 # ─── Heuristic fallback parser ──────────────────────────────────────────────
 
-_AMOUNT_RE = re.compile(
-    r"(?P<amount>\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)\s*"
-    r"(?:грн|UAH|₴|USD|\$|EUR|€)?",
+_TRANSACTION_RE = re.compile(
+    r"(?P<merchant>[^\d\W][^\d\n]*?)\s+[-−]?"
+    r"(?P<amount>\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)"
+    r"\s*(?:грн|UAH|₴)",
+    re.IGNORECASE,
+)
+_NON_TRANSACTION_RE = re.compile(
+    r"\b(?:balance|available|total|account|card|iban|date|time|limit|"
+    r"баланс|залишок|доступно|всього|рахунок|рахунку|картка|картки|дата|час|ліміт)\b",
     re.IGNORECASE,
 )
 
@@ -77,29 +84,28 @@ _AMOUNT_RE = re.compile(
 def _heuristic_parse(text: str) -> list[ParsedExpense]:
     """A best-effort parser used when the AI is unavailable.
 
-    It scans each line for an amount and treats the surrounding words as the
-    merchant. Incoming-money lines are skipped. This is intentionally
-    conservative and only meant as a fallback.
+    Only accept a merchant followed by one explicit UAH amount. Headers,
+    numeric merchant names, timestamps and other ambiguous layouts are skipped.
     """
     expenses: list[ParsedExpense] = []
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line:
             continue
-        if looks_like_income(line):
+        if looks_like_income(line) or _NON_TRANSACTION_RE.search(line):
             continue
-        match = _AMOUNT_RE.search(line)
+        match = _TRANSACTION_RE.fullmatch(line)
         if not match:
             continue
         amount_str = match.group("amount").replace("\u00a0", "").replace(" ", "")
         amount_str = amount_str.replace(",", ".")
         try:
-            amount = float(amount_str)
+            amount = validate_amount(float(amount_str))
         except ValueError:
             continue
-        if amount <= 0:
+        merchant = match.group("merchant").strip(" -—:•\t")
+        if not merchant or "+" in merchant:
             continue
-        merchant = _AMOUNT_RE.sub("", line).strip(" -—:•\t") or None
         expenses.append(
             ParsedExpense(
                 amount=amount,
