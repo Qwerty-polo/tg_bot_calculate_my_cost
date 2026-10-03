@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from aiogram import Router
 from aiogram.filters import Command
@@ -11,6 +11,7 @@ from aiogram.types import Message
 from app.models import BudgetPeriod, User
 from app.services import BudgetService, ExpenseService
 from app.utils.formatting import format_stats, format_today
+from app.utils.messages import send_pages
 from app.utils.timeframe import day_range, month_range, week_range
 
 router = Router(name="stats")
@@ -20,10 +21,10 @@ router = Router(name="stats")
 async def cmd_today(
     message: Message, user: User, expense_service: ExpenseService
 ) -> None:
-    start, end = day_range(datetime.utcnow())
+    start, end = day_range(datetime.now(UTC), user.timezone)
     async with expense_service.session.begin():
         expenses = await expense_service.list_in_range(user.id, start, end)
-    await message.answer(format_today(expenses))
+    await send_pages(message, format_today(expenses, user.timezone))
 
 
 @router.message(Command("stats"))
@@ -33,10 +34,10 @@ async def cmd_stats(
     expense_service: ExpenseService,
     budget_service: BudgetService,
 ) -> None:
-    now = datetime.utcnow()
-    day_start, day_end = day_range(now)
-    week_start, week_end = week_range(now)
-    month_start, month_end = month_range(now)
+    now = datetime.now(UTC)
+    day_start, day_end = day_range(now, user.timezone)
+    week_start, week_end = week_range(now, user.timezone)
+    month_start, month_end = month_range(now, user.timezone)
 
     async with expense_service.session.begin():
         today_total = await expense_service.total_in_range(user.id, day_start, day_end)

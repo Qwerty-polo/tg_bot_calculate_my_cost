@@ -1,6 +1,6 @@
 from aiogram import Router
 
-from app.handlers import budgets, common, reset, screenshots, stats
+from app.handlers import budgets, common, expenses, reset, screenshots, stats
 
 
 def get_root_router() -> Router:
@@ -9,6 +9,7 @@ def get_root_router() -> Router:
     router.include_router(common.router)
     # Reset is early so its menu button / callbacks win over other handlers.
     router.include_router(reset.router)
+    router.include_router(expenses.router)
     router.include_router(budgets.router)
     router.include_router(stats.router)
     # Screenshot router is last: it handles bare photos.

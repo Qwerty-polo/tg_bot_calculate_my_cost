@@ -29,11 +29,11 @@ CRITICAL — skip incoming money:
 Rules:
 - amount must be a POSITIVE number (strip currency symbols and thousands
   separators). Use a dot as the decimal separator.
-- currency: ALWAYS "UAH". The user is in Ukraine and every amount is in
-  Ukrainian hryvnia. Never return USD, EUR, PLN or any other currency, even
-  if the screenshot shows a different symbol — always output "UAH".
+- currency: preserve the currency shown (UAH, USD, EUR, PLN, etc.).
+  Never relabel or convert currencies. Use "UNKNOWN" when it is not identifiable.
 - occurred_at: ISO 8601 (YYYY-MM-DDTHH:MM:SS). If only a date is visible, use
-  00:00:00. If nothing is visible, use null.
+  00:00:00. Preserve historical dates and any explicit UTC offset. Do not
+  invent a year, date or timezone. If the full date is unclear, use null.
 - merchant: the store / counterparty name as shown.
 
 Return a JSON object of the exact form:

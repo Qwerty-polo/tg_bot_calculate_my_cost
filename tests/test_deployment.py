@@ -57,13 +57,16 @@ def test_upload_migration_preserves_existing_records(tmp_path, monkeypatch):
     engine = sa.create_engine(f"sqlite:///{database}")
     try:
         with engine.begin() as connection:
-            connection.execute(User.__table__.insert().values(id=1, telegram_id=1))
+            legacy_users = sa.Table("users", sa.MetaData(), autoload_with=connection)
+            connection.execute(legacy_users.insert().values(id=1, telegram_id=1, currency="UAH"))
             connection.execute(Expense.__table__.insert().values(
                 user_id=1, amount=50, occurred_at=datetime(2026, 1, 1), merchant="Cafe"
             ))
         command.upgrade(config, "head")
         with engine.connect() as connection:
             assert "uploads" in sa.inspect(connection).get_table_names()
+            assert connection.scalar(sa.select(User.timezone)) == "Europe/Kyiv"
+            assert connection.scalar(sa.select(Expense.occurred_at)) == datetime(2026, 1, 1)
             assert connection.scalar(sa.select(sa.func.count()).select_from(Expense)) == 1
         command.downgrade(config, "b1c2d3e4f5a6")
         with engine.connect() as connection:

@@ -31,6 +31,9 @@ jobs:
       - name: Pytest
         run: pytest -q
 
+      - name: Offline demo assertions
+        run: python -m scripts.demo
+
       - name: Alembic migrations apply cleanly
         env:
           DATABASE_URL: sqlite+aiosqlite:///./data/ci.db

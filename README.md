@@ -7,11 +7,20 @@ async handlers, OCR, optional Gemini extraction, SQLAlchemy, and Alembic.
 SQLite and long polling are intentional choices for a small, single-instance
 application. This project is not production-ready financial software.
 
+![Offline demo: review expenses, local statistics, and totals after deletion](docs/images/demo.svg)
+
+*Fictional data; actual bot responses rendered offline. Telegram and OCR/AI are
+simulated in this demo. [Reproduce the walkthrough](#offline-demo).*
+
 ## Features
 
 - Extract expenses from screenshots sent as Telegram **photos**.
 - Use Gemini when configured, or a conservative local fallback parser.
 - Validate amounts and filter likely incoming-money transactions.
+- Review dates and amounts, then explicitly confirm or cancel before saving.
+- Preserve historical purchase dates and use each user's local calendar.
+- Reject foreign/unknown AI currencies instead of relabeling them as UAH.
+- Browse paginated history and delete individual expenses after confirmation.
 - Set weekly/monthly spending limits and view totals and remaining budgets.
 - Detect exact repeat image uploads per user.
 - Reset your expenses, budgets, and upload fingerprints after confirmation.
@@ -22,9 +31,12 @@ application. This project is not production-ready financial software.
 | `/start`, `/help` | Introduction and usage instructions |
 | `/set_week_budget 5000` | Set a weekly limit, or omit the amount for a prompt |
 | `/set_month_budget 20000` | Set a monthly limit, or omit the amount for a prompt |
-| `/cancel` | Cancel pending budget input |
+| `/cancel` | Cancel a pending budget, screenshot review, or deletion |
 | `/today` | List today's recorded expenses |
 | `/stats` | Show daily, weekly, and monthly totals against budgets |
+| `/expenses`, `/expenses 2` | Browse all purchase dates, ten expenses per page |
+| `/delete 42` | Review and confirm deletion of expense #42 |
+| `/timezone Europe/Kyiv` | Set local calendar timezone; omit the name to view it |
 
 The **Reset Statistics** button is available in the private-chat menu.
 
@@ -44,9 +56,9 @@ Exact dependency versions are in [requirements.txt](requirements.txt) and
 ## Architecture and screenshot processing
 
 ```text
-Telegram photo → local OCR → Gemini or fallback parser → validation → SQLite
-                                                                      ↓
-                                                        commit → Telegram summary
+Telegram photo → duplicate check → OCR → extraction → validation → review
+                                                                     ↓
+                                             user confirms → SQLite commit → summary
 ```
 
 OCR runs in a worker thread. Gemini receives the extracted text, not the image.
@@ -55,9 +67,25 @@ clear same-line entries such as `Silpo 230.50 грн`. Ambiguous lines are skipp
 Amounts must be finite, positive, have at most two decimal places, and fit the
 database's `Numeric(12, 2)` range. Income filtering is heuristic and can make mistakes.
 
+The AI must preserve the original currency. If any AI transaction has a foreign
+or unknown currency, the entire preview is rejected with an explanation. The local
+fallback accepts only explicit UAH lines; it does not convert or import foreign amounts.
+Screenshots with more than 100 extracted expenses must be split into smaller uploads.
+
 Handlers use short database transactions, finishing commits before success replies.
 A failed Telegram confirmation does not roll back saved records. Each successful
 upload stores a per-user SHA-256 image fingerprint atomically with its expenses.
+Preview callbacks carry a random token bound to the user's pending action. Events
+for the same user are serialized, and repeated/stale confirmations cannot add rows twice.
+
+Purchase timestamps are stored as UTC; naive dates from the screenshot are interpreted
+in the timezone shown on the preview. Missing dates use the upload time, visibly marked
+for review. `created_at` separately records when the expense was saved. The default
+timezone is `Europe/Kyiv`; `/timezone` changes local display and day/week/month boundaries,
+including daylight-saving transitions. An open preview retains its displayed timezone.
+
+Deleting one expense preserves its image fingerprint, preventing an accidental re-upload
+from restoring it or duplicating other rows. A full reset also clears the fingerprints.
 
 ```text
 app/
@@ -74,8 +102,9 @@ app/
 └── utils/        # Money validation, formatting, date boundaries, logging
 alembic/          # Versioned schema migrations
 tests/            # Unit, database, dispatcher, and migration regression tests
-scripts/          # Optional manual pipeline smoke test
-docs/images/      # Reserved for real, redacted demo screenshots
+scripts/          # Offline demo and optional OCR pipeline smoke test
+docs/demo/        # Fictional fixtures, generated walkthrough and transcript
+docs/images/      # Generated portfolio illustration
 ```
 
 ## Local setup
@@ -121,7 +150,9 @@ python -m app.main
 ```
 
 Open a private chat with your bot, send `/start`, and upload a banking screenshot
-as a photo. Stop the local process with Ctrl+C.
+as a photo. Review the preview and press **Confirm expenses** to save it, or **Cancel**
+to discard it. Use `/expenses` to find a saved expense ID and `/delete ID` to remove a
+mistake. Stop the local process with Ctrl+C.
 
 ## Environment variables
 
@@ -148,7 +179,11 @@ including PyTorch; the default setup uses Tesseract.
 
 Run `alembic upgrade head` **before the first bot startup** and after pulling
 schema changes. It creates the SQLite directory and applies migrations, including
-the upload-fingerprint table. Back up existing data before an upgrade.
+the upload-fingerprint table and per-user timezone. Back up existing data before an upgrade.
+
+The timezone migration preserves existing rows and timestamps. Previous versions may
+already have relabeled a foreign amount or overwritten a historical purchase date;
+those original values cannot be recovered automatically. Review old records separately.
 
 For development schema changes:
 
@@ -193,6 +228,9 @@ The suite covers parsing, validation, user isolation, FSM routing, private-chat
 guards, commit/reply failures, duplicate uploads, logging privacy, build-context
 rules, and migrations. Telegram, OCR, and AI are mocked in dispatcher tests;
 tests do not require live credentials. CI runs lint, tests, and a migration check.
+Regression cases include review/cancel/repeated callbacks, individual deletion and
+user isolation, failed commits, historical purchases, timezone changes, daylight-saving
+boundaries, currency rejection, and bounded HTML messages.
 
 The optional `python -m scripts.smoke_test` exercises OCR through persistence with
 a synthetic input. It requires OCR, writes to a database, and may call Gemini.
@@ -206,8 +244,9 @@ assertion-based test or a portfolio screenshot.
   `/cancel` remain available in groups.
 - Message logs omit full message bodies and profile details. Never publish real
   banking screenshots, `.env`, database files, or logs containing personal data.
-- OCR text is stored unencrypted in SQLite and sent to Google when Gemini is
-  enabled. Protect the database and use redacted inputs for demonstrations.
+- OCR text is held in memory during review, stored unencrypted in SQLite after
+  confirmation, and sent to Google during extraction when Gemini is enabled.
+  Protect the database and use redacted inputs for demonstrations.
 - Reset removes expenses, budgets, and fingerprints; the user profile remains.
 - This MVP has no application-level rate limiting. Use the allow-list for a
   personal deployment.
@@ -219,29 +258,36 @@ assertion-based test or a portfolio screenshot.
   cannot be detected retrospectively.
 - **No bank synchronization:** users upload screenshots manually; images sent as
   Telegram documents are not handled.
-- **No individual transaction editing/deletion:** only a full statistics reset
-  is available. OCR/AI extraction and income filtering can be inaccurate.
-- **Historical dates:** a parsed purchase date is retained only if it matches
-  the current UTC day; other dates are replaced with processing time. Statistics
-  use UTC boundaries, not the user's local timezone.
-- **No currency conversion:** amounts are stored/displayed as UAH. AI output in
-  another currency is relabeled without conversion; fallback accepts explicit
-  UAH amounts only. Use UAH screenshots.
+- **No inline editing:** cancel a wrong preview and submit a corrected screenshot,
+  or delete individual saved expenses. OCR/AI and income filtering can still be inaccurate.
+- **Unclear dates:** the local fallback does not extract dates. Missing or incomplete
+  AI dates use the upload time and are marked in the preview. Review dates before saving.
+- **UAH only:** no currency conversion or multi-currency budgets. Foreign/unknown
+  AI currencies are rejected; the fallback skips lines without explicit UAH.
 - **MVP operation:** SQLite and long polling target a single instance. Pending
-  conversations are in memory and disappear on restart. Large expense lists
-  are not paginated and may exceed Telegram's message-length limit.
+  reviews/conversations are in memory and disappear on restart; resend the image.
+  One pending action per user is supported. Processing has no global concurrency
+  limit or application-specific OCR/AI timeout yet.
 
-## Demo screenshots
+## Offline demo
 
-Real, redacted screenshots can be added to `docs/images/`. No screenshots are
-included yet.
+After installing dependencies, run:
 
-<!-- Portfolio image slots: add Markdown image links only after the files exist.
-docs/images/start-help.png — private-chat introduction and available commands
-docs/images/expense-extraction.png — successful extraction using redacted demo data
-docs/images/statistics-budget.png — totals and remaining weekly/monthly budgets
-Remove names, account/card numbers, balances, and other personal details before upload.
--->
+```bash
+python -m scripts.demo
+```
+
+Open [docs/demo/index.html](docs/demo/index.html) locally for the complete walkthrough.
+The script also regenerates the README illustration and a JSON transcript. It needs
+no Telegram/Gemini credentials, no OCR installation, and does not touch your real database.
+
+It drives the real dispatcher, confirmation/deletion handlers, services and an in-memory
+SQLite database. Telegram transport and OCR/AI results are simulated using
+[fictional transactions](docs/demo/transactions.json). Assertions verify that the
+preview saves nothing, confirmation saves three purchases, the September purchase
+stays outside October totals, and deleting one expense updates the statistics.
+The illustration is an offline rendering, not a screenshot of the Telegram application
+or a measurement of OCR accuracy.
 
 ## Author and contact
 

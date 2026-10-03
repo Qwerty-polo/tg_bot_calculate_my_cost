@@ -3,6 +3,16 @@
 from decimal import Decimal, InvalidOperation
 
 
+class UnsupportedCurrencyError(ValueError):
+    """The input is not explicitly denominated in UAH."""
+
+
+def validate_currency(value: str | None) -> str:
+    if not isinstance(value, str) or value.strip().upper() not in {"UAH", "ГРН", "₴"}:
+        raise UnsupportedCurrencyError("Only explicit UAH expenses are supported")
+    return "UAH"
+
+
 def validate_amount(value: float) -> float:
     """Accept finite positive amounts representable by Numeric(12, 2)."""
     try:

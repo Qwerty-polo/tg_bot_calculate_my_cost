@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import io
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./data/smoke.db")
 
@@ -68,7 +68,7 @@ async def main() -> None:
         await budgets.set_budget(user.id, BudgetPeriod.WEEK, 5000, user.currency)
         await budgets.set_budget(user.id, BudgetPeriod.MONTH, 15000, user.currency)
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         today = await expenses.list_in_range(user.id, *day_range(now))
         print("\n=== TODAY ===")
         print(format_today(today))

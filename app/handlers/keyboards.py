@@ -17,6 +17,13 @@ RESET_CONFIRM = "reset:confirm"
 RESET_CANCEL = "reset:cancel"
 
 
+def action_keyboard(action: str, token: str, label: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=label, callback_data=f"{action}:confirm:{token}"),
+        InlineKeyboardButton(text="Cancel", callback_data=f"{action}:cancel:{token}"),
+    ]])
+
+
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     """Persistent reply keyboard shown under the chat input."""
     return ReplyKeyboardMarkup(

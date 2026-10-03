@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.sqlite import insert
@@ -12,7 +12,8 @@ from app.ai import looks_like_income
 from app.ai.schemas import ParsedExpense
 from app.config import CURRENCY_CODE
 from app.models import Expense, Upload
-from app.utils.money import validate_amount
+from app.utils.money import validate_amount, validate_currency
+from app.utils.timeframe import DEFAULT_TIMEZONE, as_utc
 
 
 class ExpenseService:
@@ -20,7 +21,8 @@ class ExpenseService:
         self.session = session
 
     async def add_upload(
-        self, user_id: int, digest: str, parsed: list[ParsedExpense], *, raw_text: str
+        self, user_id: int, digest: str, parsed: list[ParsedExpense], *, raw_text: str,
+        fallback_dt: datetime | None = None, timezone: str = DEFAULT_TIMEZONE,
     ) -> list[Expense] | None:
         """Return None for a duplicate. Caller commits marker and rows together."""
         parsed = [item for item in parsed if not looks_like_income(item.merchant)]
@@ -33,7 +35,9 @@ class ExpenseService:
         )
         if result.rowcount == 0:
             return None
-        return await self.add_many(user_id, parsed, raw_text=raw_text)
+        return await self.add_many(
+            user_id, parsed, raw_text=raw_text, fallback_dt=fallback_dt, timezone=timezone
+        )
 
     async def add_many(
         self,
@@ -42,25 +46,25 @@ class ExpenseService:
         *,
         raw_text: str | None = None,
         fallback_dt: datetime | None = None,
+        timezone: str = DEFAULT_TIMEZONE,
     ) -> list[Expense]:
         """Persist a batch of parsed expenses for a user (always in UAH).
 
         Incoming transfers (top-ups, cashback, salary, etc.) are rejected here
         as a safety net even if the AI accidentally returns one.
 
-        Expenses are logged at the receipt time (``fallback_dt``, i.e. now) so
-        they always show up under "today". A purchase time parsed from the
-        screenshot is only kept when it falls on the same calendar day, since
-        OCR/AI often reports a past or wrongly-guessed date.
+        Parsed local purchase dates are normalized to UTC. Only missing dates
+        use the upload receipt time; created_at records the persistence time.
         """
-        fallback_dt = fallback_dt or datetime.utcnow()
+        fallback_dt = as_utc(fallback_dt or datetime.now(UTC))
         created: list[Expense] = []
         for item in parsed:
             if looks_like_income(item.merchant):
                 continue
-            occurred_at = item.occurred_at
-            if occurred_at is None or occurred_at.date() != fallback_dt.date():
-                occurred_at = fallback_dt
+            validate_currency(item.currency)
+            occurred_at = (
+                as_utc(item.occurred_at, timezone) if item.occurred_at else fallback_dt
+            )
             expense = Expense(
                 user_id=user_id,
                 amount=validate_amount(item.amount),
@@ -73,6 +77,28 @@ class ExpenseService:
             created.append(expense)
         await self.session.flush()
         return created
+
+    async def has_upload(self, user_id: int, digest: str) -> bool:
+        return await self.session.get(Upload, (user_id, digest)) is not None
+
+    async def get_for_user(self, user_id: int, expense_id: int) -> Expense | None:
+        return await self.session.scalar(
+            select(Expense).where(Expense.user_id == user_id, Expense.id == expense_id)
+        )
+
+    async def delete_for_user(self, user_id: int, expense_id: int) -> bool:
+        result = await self.session.execute(
+            delete(Expense).where(Expense.user_id == user_id, Expense.id == expense_id)
+        )
+        return bool(result.rowcount)
+
+    async def recent(self, user_id: int, page: int, page_size: int = 10) -> list[Expense]:
+        result = await self.session.scalars(
+            select(Expense).where(Expense.user_id == user_id)
+            .order_by(Expense.occurred_at.desc(), Expense.id.desc())
+            .offset((page - 1) * page_size).limit(page_size)
+        )
+        return list(result)
 
     async def delete_all_for_user(self, user_id: int) -> int:
         """Delete every expense for a user. Returns the number removed."""

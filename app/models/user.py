@@ -24,6 +24,9 @@ class User(Base, TimestampMixin):
     username: Mapped[str | None] = mapped_column(String(255), default=None)
     full_name: Mapped[str | None] = mapped_column(String(255), default=None)
     currency: Mapped[str] = mapped_column(String(8), default="UAH")
+    timezone: Mapped[str] = mapped_column(
+        String(64), default="Europe/Kyiv", server_default="Europe/Kyiv"
+    )
 
     expenses: Mapped[list[Expense]] = relationship(
         back_populates="user",

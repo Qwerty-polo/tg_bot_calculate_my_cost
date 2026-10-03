@@ -11,7 +11,7 @@ import pytest
 import pytest_asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.base import BaseSession
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.memory import MemoryStorage, SimpleEventIsolation
 from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage
 from aiogram.types import CallbackQuery, Chat, Message, PhotoSize, Update, User
 from sqlalchemy import event, func, select
@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.ai.schemas import ParsedExpense
 from app.database.base import Base
 from app.handlers import budgets, common, reset, screenshots, stats
+from app.handlers import expenses as expense_handlers
 from app.handlers.keyboards import RESET_CONFIRM
 from app.middlewares.database import ServicesMiddleware
 from app.middlewares.logging import LoggingMiddleware
@@ -87,24 +88,24 @@ async def app(monkeypatch, tmp_path):
     )
     transport = TelegramStub(sessions)
     bot = Bot("123456:TEST_TOKEN", session=transport)
-    dispatcher = Dispatcher(storage=MemoryStorage())
+    dispatcher = Dispatcher(storage=MemoryStorage(), events_isolation=SimpleEventIsolation())
     dispatcher.message.outer_middleware(LoggingMiddleware())
     dispatcher.message.middleware(ServicesMiddleware())
     dispatcher.callback_query.middleware(ServicesMiddleware())
-    for module in (common, reset, budgets, stats, screenshots):
+    for module in (common, reset, expense_handlers, budgets, stats, screenshots):
         dispatcher.include_router(copy.deepcopy(module.router))
 
-    async def send(text=None, *, chat_type="private", photo=False, callback=False):
+    async def send(text=None, *, chat_type="private", photo=False, callback=False, user_id=1):
         message = Message(
-            message_id=1, date=datetime.now(UTC), chat=Chat(id=1, type=chat_type),
-            from_user=User(id=1, is_bot=False, first_name="Tester"), text=text,
+            message_id=1, date=datetime.now(UTC), chat=Chat(id=user_id, type=chat_type),
+            from_user=User(id=user_id, is_bot=False, first_name="Tester"), text=text,
             photo=[PhotoSize(file_id="photo", file_unique_id="unique", width=10, height=10)]
             if photo else None,
         )
         if callback:
             update = Update(update_id=1, callback_query=CallbackQuery(
                 id="cb", from_user=message.from_user, chat_instance="test",
-                message=message, data=RESET_CONFIRM,
+                message=message, data=RESET_CONFIRM if callback is True else callback,
             ))
         else:
             update = Update(update_id=1, message=message)
@@ -126,9 +127,20 @@ async def app(monkeypatch, tmp_path):
     monkeypatch.setattr(screenshots, "extract_text", ocr)
     monkeypatch.setattr(screenshots, "parse_transactions", parse)
     state = dispatcher.fsm.get_context(bot=bot, chat_id=1, user_id=1)
+
+    async def confirm_upload():
+        pending = await state.get_data()
+        return await send(callback=f"upload:confirm:{pending['token']}")
+
+    async def save_photo():
+        await send(photo=True)
+        await confirm_upload()
+
     yield SimpleNamespace(send=send, factory=factory, transport=transport, state=state,
-                          controls=controls, sessions=sessions)
+                          controls=controls, sessions=sessions, save_photo=save_photo,
+                          confirm_upload=confirm_upload)
     await dispatcher.storage.close()
+    await dispatcher.fsm.events_isolation.close()
     await bot.session.close()
     await engine.dispose()
 
@@ -180,7 +192,10 @@ async def test_basic_commands_work_in_groups(app, command):
 async def test_telegram_failure_does_not_rollback_committed_financial_data(app, photo):
     app.transport.fail_success = True
     with pytest.raises(RuntimeError, match="Telegram unavailable"):
-        await app.send(None if photo else "/set_week_budget 5000", photo=photo)
+        if photo:
+            await app.save_photo()
+        else:
+            await app.send("/set_week_budget 5000")
     async with app.factory() as session:
         model = Expense if photo else Budget
         assert await session.scalar(select(func.count()).select_from(model)) == 1
@@ -199,32 +214,33 @@ async def test_commit_failure_does_not_send_success_or_clear_pending_input(app):
 
 
 async def test_exact_reupload_does_not_add_expenses_and_reset_allows_reupload(app):
-    await app.send(photo=True)
+    await app.save_photo()
     await app.send(photo=True)
     assert "already been recorded" in app.transport.requests[-1].text
     async with app.factory() as session:
         assert await session.scalar(select(func.count()).select_from(Expense)) == 1
         assert await session.scalar(select(func.count()).select_from(Upload)) == 1
     await app.send(callback=True)
-    await app.send(photo=True)
-    assert "Added" in app.transport.requests[-1].text
+    await app.save_photo()
+    assert "Added" in app.transport.requests[-2].text
 
 
 async def test_failed_upload_commit_leaves_no_expenses_or_marker_and_can_retry(app):
+    await app.send(photo=True)
     app.controls.fail_commit = True
     with pytest.raises(RuntimeError, match="Commit failed"):
-        await app.send(photo=True)
+        await app.confirm_upload()
     assert not any("Added" in getattr(r, "text", "") for r in app.transport.requests)
     async with app.factory() as session:
         for model in (Expense, Upload):
             assert await session.scalar(select(func.count()).select_from(model)) == 0
     app.controls.fail_commit = False
-    await app.send(photo=True)
-    assert "Added" in app.transport.requests[-1].text
+    await app.confirm_upload()
+    assert "Added" in app.transport.requests[-2].text
 
 
 async def test_reset_reply_failure_does_not_undo_reset(app):
-    await app.send(photo=True)
+    await app.save_photo()
     await app.send("/set_week_budget 5000")
     app.transport.fail_success = True
     with pytest.raises(RuntimeError, match="Telegram unavailable"):

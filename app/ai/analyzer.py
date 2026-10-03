@@ -1,9 +1,7 @@
 """Transaction parsing: OCR text -> structured expenses.
 
 :func:`parse_transactions` uses Gemini when a key is configured and falls back
-to a heuristic regex parser otherwise. The bot is UAH-only, so every parsed
-expense is stored in hryvnia regardless of any currency symbol in the
-screenshot.
+to a heuristic regex parser otherwise. Foreign currencies are never relabeled.
 """
 
 from __future__ import annotations
@@ -15,7 +13,7 @@ import re
 from app.ai import prompts
 from app.ai.schemas import ParsedExpense, ParsedExpenseList
 from app.config import settings
-from app.utils.money import validate_amount
+from app.utils.money import UnsupportedCurrencyError, validate_amount, validate_currency
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +46,10 @@ async def parse_transactions(ocr_text: str) -> list[ParsedExpense]:
     if settings.has_llm:
         try:
             return await _parse_with_ai(text)
-        except Exception:  # noqa: BLE001 - fall back, never crash the handler
-            logger.exception("AI transaction parsing failed; using heuristic fallback")
+        except UnsupportedCurrencyError:
+            raise
+        except Exception as exc:
+            logger.warning("AI parsing failed (%s); using fallback", type(exc).__name__)
 
     return _heuristic_parse(text)
 
@@ -62,6 +62,8 @@ async def _parse_with_ai(ocr_text: str) -> list[ParsedExpense]:
         prompts.TRANSACTION_USER_PROMPT.format(ocr_text=ocr_text),
     )
     data = json.loads(raw)
+    for item in data.get("expenses", []):
+        validate_currency(item.get("currency"))
     parsed = ParsedExpenseList.model_validate(data)
     return parsed.expenses
 

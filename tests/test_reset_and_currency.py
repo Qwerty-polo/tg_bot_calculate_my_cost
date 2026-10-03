@@ -1,9 +1,10 @@
-"""Tests for UAH-forcing and the per-user Reset Statistics deletes."""
+"""Currency validation, historical dates and per-user resets."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.ai.schemas import ParsedExpense
@@ -23,10 +24,11 @@ async def session():
     await engine.dispose()
 
 
-def test_parsed_expense_forces_uah():
-    # Even when the AI/screenshot reports a foreign currency, store UAH.
-    assert ParsedExpense(amount=10, currency="USD").currency == "UAH"
-    assert ParsedExpense(amount=10, currency="€").currency == "UAH"
+def test_parsed_expense_rejects_foreign_currency():
+    for currency in ("USD", "€", "PLN", "UNKNOWN"):
+        with pytest.raises(ValidationError):
+            ParsedExpense(amount=10, currency=currency)
+    assert ParsedExpense(amount=10, currency="грн").currency == "UAH"
     assert ParsedExpense(amount=10).currency == "UAH"
 
 
@@ -35,7 +37,7 @@ async def test_add_many_stores_uah(session):
     user = await UserService(session).get_or_create(1, username="u")
     expenses = ExpenseService(session)
     created = await expenses.add_many(
-        user.id, [ParsedExpense(amount=100, currency="USD", merchant="X")]
+        user.id, [ParsedExpense(amount=100, currency="UAH", merchant="X")]
     )
     assert created[0].currency == "UAH"
 
@@ -58,20 +60,20 @@ async def test_add_many_rejects_incoming(session):
 
 
 @pytest.mark.asyncio
-async def test_add_many_logs_past_dated_expense_under_today(session):
-    # A screenshot's transaction dated days ago must still appear under "today",
-    # since the bot logs expenses at receipt time.
-    from datetime import timedelta
-
+async def test_add_many_preserves_historical_purchase_date(session):
     from app.utils.timeframe import day_range
 
     user = await UserService(session).get_or_create(1, username="u")
     expenses = ExpenseService(session)
-    old = datetime.utcnow() - timedelta(days=3)
-    await expenses.add_many(
-        user.id, [ParsedExpense(amount=245, merchant="Silpo", occurred_at=old)]
+    old = datetime(2026, 9, 1, 9, 30)
+    created = await expenses.add_many(
+        user.id, [ParsedExpense(amount=245, merchant="Silpo", occurred_at=old)],
+        fallback_dt=datetime(2026, 10, 3, 12, tzinfo=UTC),
     )
-    start, end = day_range(datetime.utcnow())
+    assert created[0].occurred_at == datetime(2026, 9, 1, 6, 30)
+    start, end = day_range(datetime(2026, 10, 3, 12, tzinfo=UTC))
+    assert await expenses.total_in_range(user.id, start, end) == 0
+    start, end = day_range(datetime(2026, 9, 1, 12, tzinfo=UTC))
     assert await expenses.total_in_range(user.id, start, end) == 245
 
 
@@ -79,14 +81,13 @@ async def test_add_many_logs_past_dated_expense_under_today(session):
 async def test_add_many_keeps_same_day_purchase_time(session):
     user = await UserService(session).get_or_create(1, username="u")
     expenses = ExpenseService(session)
-    today_time = datetime.utcnow().replace(hour=9, minute=15, second=0, microsecond=0)
+    today_time = datetime(2026, 1, 15, 9, 15)
     created = await expenses.add_many(
         user.id,
         [ParsedExpense(amount=50, merchant="Cafe", occurred_at=today_time)],
-        fallback_dt=datetime.utcnow().replace(hour=18),
+        fallback_dt=datetime(2026, 1, 15, 18, tzinfo=UTC),
     )
-    # Same-day purchase time is preserved (not overwritten by the receipt time).
-    assert created[0].occurred_at.hour == 9
+    assert created[0].occurred_at == datetime(2026, 1, 15, 7, 15)
 
 
 @pytest.mark.asyncio
