@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expense Tracker · Offline Demo</title>
+<style>
+body{margin:0;background:#0b1421;color:#e1eaf5;font:16px/1.6 system-ui,sans-serif}
+main{max-width:1150px;margin:auto;padding:48px 24px}h1{font-size:40px;line-height:1.15}
+h2{font-size:18px;color:#63e6c6}.note{color:#99acc2;max-width:850px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:22px}
+article{padding:24px;background:#152337;border:1px solid #2c415b;border-radius:16px}
+.message{white-space:pre-wrap;overflow-wrap:anywhere}code{color:#63e6c6}
+</style></head><body><main><h1>Review first. Keep your ledger accurate.</h1>
+<p class="note">Fictional transactions, actual bot responses. This offline walkthrough uses
+the real handlers and an in-memory SQLite database. Telegram transport and OCR/AI are simulated;
+this is not a live Telegram screenshot or an OCR accuracy benchmark.</p>
+<p class="note">Demo date: October 3, 2026 · Europe/Kyiv. The September purchase keeps its date.
+The taxi is removed individually after confirmation.</p><section class="grid"><article><h2>01 / Review · nothing saved</h2><div class="message"><b>Review expenses before saving</b>
+Timezone: Europe/Kyiv
+
+2026-10-03 09:15 — Demo Market ₴230.50
+2026-10-03 10:40 — Demo Taxi ₴120
+2026-09-30 18:20 — Demo Cafe ₴75
+
+<b>Total:</b> ₴425.50
+Check amounts, merchants and dates. Nothing is saved yet.
+Confirm to save, or cancel and send a corrected screenshot.</div></article><article><h2>02 / Confirm · dates preserved</h2><div class="message">✅ Added <b>3</b> expense(s):
+
+#1 · 2026-10-03 09:15 — Demo Market ₴230.50
+#2 · 2026-10-03 10:40 — Demo Taxi ₴120
+#3 · 2026-09-30 18:20 — Demo Cafe ₴75
+
+<b>Total:</b> ₴425.50
+Remove a mistake with /delete ID. View history with /expenses.</div></article><article><h2>03 / Statistics · local calendar</h2><div class="message"><b>📊 Statistics</b>
+
+Total today: ₴350.50
+Total this week: ₴425.50 / ₴1 000 limit
+Total this month: ₴350.50 / ₴5 000 limit
+
+Remaining weekly budget: ₴574.50
+Remaining monthly budget: ₴4 649.50</div></article><article><h2>04 / Delete · one expense</h2><div class="message"><b>Delete this expense?</b>
+
+#2 · 2026-10-03 10:40 — Demo Taxi ₴120
+
+Your budgets and other expenses will remain.</div></article><article><h2>05 / Updated statistics</h2><div class="message"><b>📊 Statistics</b>
+
+Total today: ₴230.50
+Total this week: ₴305.50 / ₴1 000 limit
+Total this month: ₴230.50 / ₴5 000 limit
+
+Remaining weekly budget: ₴694.50
+Remaining monthly budget: ₴4 769.50</div></article>
+</section><p class="note">Rebuild with <code>python -m scripts.demo</code>.
+No credentials, external calls or persistent database required.</p></main></body></html>

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="900" viewBox="0 0 1320 900" role="img" aria-labelledby="title desc">
+<title id="title">Expense Tracker: review, confirm, manage</title>
+<desc id="desc">Offline demonstration with fictional transactions. Bot responses come from the real handlers and an in-memory database.</desc>
+<rect width="1320" height="900" rx="24" fill="#0b1421"/>
+<g font-family="Segoe UI,Arial,sans-serif">
+<text x="42" y="60" fill="#63e6c6" font-size="16" letter-spacing="3">TELEGRAM EXPENSE TRACKER</text>
+<text x="42" y="115" fill="#f0f6fc" font-size="38" font-weight="700">Review first. Keep your ledger accurate.</text>
+<text x="42" y="153" fill="#99acc2" font-size="17">Historical dates · UAH validation · Local budgets · Individual deletion</text>
+<rect x="42" y="194" width="400" height="590" rx="16" fill="#152337" stroke="#2c415b"/>
+<text x="64" y="232" fill="#63e6c6" font-size="16" font-weight="600">01 / Review · nothing saved</text>
+<text x="64" y="272" fill="#e1eaf5" font-size="15">Review expenses before saving</text>
+<text x="64" y="294" fill="#e1eaf5" font-size="15">Timezone: Europe/Kyiv</text>
+<text x="64" y="316" fill="#e1eaf5" font-size="15"></text>
+<text x="64" y="338" fill="#e1eaf5" font-size="15">2026-10-03 09:15 — Demo Market ₴230.50</text>
+<text x="64" y="360" fill="#e1eaf5" font-size="15">2026-10-03 10:40 — Demo Taxi ₴120</text>
+<text x="64" y="382" fill="#e1eaf5" font-size="15">2026-09-30 18:20 — Demo Cafe ₴75</text>
+<text x="64" y="404" fill="#e1eaf5" font-size="15"></text>
+<text x="64" y="426" fill="#e1eaf5" font-size="15">Total: ₴425.50</text>
+<text x="64" y="448" fill="#e1eaf5" font-size="15">Check amounts, merchants and dates.</text>
+<text x="64" y="470" fill="#e1eaf5" font-size="15">Nothing is saved yet.</text>
+<text x="64" y="492" fill="#e1eaf5" font-size="15">Confirm to save, or cancel and send a</text>
+<text x="64" y="514" fill="#e1eaf5" font-size="15">corrected screenshot.</text>
+<rect x="64" y="724" width="230" height="38" rx="9" fill="#247863"/>
+<text x="84" y="749" fill="white" font-size="15">Confirm expenses</text>
+<rect x="460" y="194" width="400" height="590" rx="16" fill="#152337" stroke="#2c415b"/>
+<text x="482" y="232" fill="#63e6c6" font-size="16" font-weight="600">03 / Statistics · local calendar</text>
+<text x="482" y="272" fill="#e1eaf5" font-size="15">📊 Statistics</text>
+<text x="482" y="294" fill="#e1eaf5" font-size="15"></text>
+<text x="482" y="316" fill="#e1eaf5" font-size="15">Total today: ₴350.50</text>
+<text x="482" y="338" fill="#e1eaf5" font-size="15">Total this week: ₴425.50 / ₴1 000 limit</text>
+<text x="482" y="360" fill="#e1eaf5" font-size="15">Total this month: ₴350.50 / ₴5 000</text>
+<text x="482" y="382" fill="#e1eaf5" font-size="15">limit</text>
+<text x="482" y="404" fill="#e1eaf5" font-size="15"></text>
+<text x="482" y="426" fill="#e1eaf5" font-size="15">Remaining weekly budget: ₴574.50</text>
+<text x="482" y="448" fill="#e1eaf5" font-size="15">Remaining monthly budget: ₴4 649.50</text>
+<rect x="878" y="194" width="400" height="590" rx="16" fill="#152337" stroke="#2c415b"/>
+<text x="900" y="232" fill="#63e6c6" font-size="16" font-weight="600">05 / Updated statistics</text>
+<text x="900" y="272" fill="#e1eaf5" font-size="15">📊 Statistics</text>
+<text x="900" y="294" fill="#e1eaf5" font-size="15"></text>
+<text x="900" y="316" fill="#e1eaf5" font-size="15">Total today: ₴230.50</text>
+<text x="900" y="338" fill="#e1eaf5" font-size="15">Total this week: ₴305.50 / ₴1 000 limit</text>
+<text x="900" y="360" fill="#e1eaf5" font-size="15">Total this month: ₴230.50 / ₴5 000</text>
+<text x="900" y="382" fill="#e1eaf5" font-size="15">limit</text>
+<text x="900" y="404" fill="#e1eaf5" font-size="15"></text>
+<text x="900" y="426" fill="#e1eaf5" font-size="15">Remaining weekly budget: ₴694.50</text>
+<text x="900" y="448" fill="#e1eaf5" font-size="15">Remaining monthly budget: ₴4 769.50</text>
+<text x="42" y="833" fill="#99acc2" font-size="16">Fictional data · Offline rendering of actual bot responses · Simulated OCR/AI and Telegram</text>
+<text x="42" y="864" fill="#99acc2" font-size="15">The September 30 purchase stays in September. Deleting the taxi updates totals, not your budget.</text>
+</g></svg>

@@ -1,0 +1,22 @@
+[
+  [
+    "01 / Review · nothing saved",
+    "<b>Review expenses before saving</b>\nTimezone: Europe/Kyiv\n\n2026-10-03 09:15 — Demo Market ₴230.50\n2026-10-03 10:40 — Demo Taxi ₴120\n2026-09-30 18:20 — Demo Cafe ₴75\n\n<b>Total:</b> ₴425.50\nCheck amounts, merchants and dates. Nothing is saved yet.\nConfirm to save, or cancel and send a corrected screenshot."
+  ],
+  [
+    "02 / Confirm · dates preserved",
+    "✅ Added <b>3</b> expense(s):\n\n#1 · 2026-10-03 09:15 — Demo Market ₴230.50\n#2 · 2026-10-03 10:40 — Demo Taxi ₴120\n#3 · 2026-09-30 18:20 — Demo Cafe ₴75\n\n<b>Total:</b> ₴425.50\nRemove a mistake with /delete ID. View history with /expenses."
+  ],
+  [
+    "03 / Statistics · local calendar",
+    "<b>📊 Statistics</b>\n\nTotal today: ₴350.50\nTotal this week: ₴425.50 / ₴1 000 limit\nTotal this month: ₴350.50 / ₴5 000 limit\n\nRemaining weekly budget: ₴574.50\nRemaining monthly budget: ₴4 649.50"
+  ],
+  [
+    "04 / Delete · one expense",
+    "<b>Delete this expense?</b>\n\n#2 · 2026-10-03 10:40 — Demo Taxi ₴120\n\nYour budgets and other expenses will remain."
+  ],
+  [
+    "05 / Updated statistics",
+    "<b>📊 Statistics</b>\n\nTotal today: ₴230.50\nTotal this week: ₴305.50 / ₴1 000 limit\nTotal this month: ₴230.50 / ₴5 000 limit\n\nRemaining weekly budget: ₴694.50\nRemaining monthly budget: ₴4 769.50"
+  ]
+]
