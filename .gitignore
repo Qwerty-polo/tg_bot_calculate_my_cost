@@ -36,3 +36,8 @@ tmp/
 .mypy_cache/
 .idea/
 .vscode/
+
+# Local IDE files, test coverage, and Celery runtime state
+.coverage
+.coverage.*
+celerybeat-schedule*
